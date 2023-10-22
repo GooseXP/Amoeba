@@ -234,8 +234,8 @@ int learn(int cmdlen) {
     // Reset the alarm
     alarm(0);
     // Update usage count for learned commands
-	for (int i = 0; i <= cmdlen; i++) {
-         wordinfo[cmdint[i]][i] += lrnval;
+    for (int i = 0; i <= cmdlen; i++) {
+        wordinfo[cmdint[i]][i] += lrnval;
     }
     int status;
     
@@ -266,7 +266,7 @@ void writedb() {
 
 int main() {
     loaddb();
-	srand((unsigned)time(&t));
+    srand((unsigned)time(&t));
     int write = 0;
     int length = 5;
     int score = 0;
@@ -282,7 +282,7 @@ int main() {
         } else if (length > 1) {
             length -= rand() % 2;
         }
-		prevscore = score;
+        prevscore = score;
         write++;
 
         // Write the database to files at regular intervals
