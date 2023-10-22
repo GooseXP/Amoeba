@@ -259,13 +259,10 @@ void writedb() {
     for (int i = 0; i < dbloc; i++) {
         fprintf(writewrd, "%s\n", wordarray[i]);
         for (int j = 0; j < CMDMAX; j++) {
-            fprintf(writeinfo, "%d ", wordinfo[i][j]);
+            fprintf(writeinfo, "%d", wordinfo[i][j]);
         }
         fprintf(writeinfo, "\n");
     }
-
-    fclose(writewrd);
-    fclose(writeinfo);
 }
 
 
@@ -299,4 +296,3 @@ int main() {
     
     return 0;
 }
-
