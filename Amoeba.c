@@ -133,7 +133,6 @@ int learn(int cmdlen) {
     int lrnval = 0; // Initialize lrnval to 0
     int srchitr = rand() % dbloc + 1;
     int select = 0;
-    int prv_select = 0;
     int cmdint[CMDMAX];
     char word[WRDBUFFER];
     char cmd[WRDBUFFER * CMDMAX];
