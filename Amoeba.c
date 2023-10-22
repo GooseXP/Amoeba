@@ -133,7 +133,7 @@ int learn(int cmdlen) {
     int lrnval = 0; // Initialize lrnval to 0
     int srchitr = rand() % dbloc + 1;
     int select = 0;
-    int prv_select=0;
+    int prv_select = 0;
     int cmdint[CMDMAX];
     char word[WRDBUFFER];
     char cmd[WRDBUFFER * CMDMAX];
@@ -181,6 +181,10 @@ int learn(int cmdlen) {
         execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)0);
         // Exec failed
         perror("execl");
+        exit(1);
+    } else if (child_pid < 0) {
+        // Handle fork failure
+        perror("fork");
         exit(1);
     }
 
@@ -235,15 +239,9 @@ int learn(int cmdlen) {
         wordinfo[cmdint[i]][i] += lrnval;
     }
 
-    // Process the output_buffer as needed
-
-    // ...
-
-    // Wait for the child process to complete
     int status;
+    
     waitpid(child_pid, &status, 0);
-
-    // ...
 
     return lrnval;
 }
