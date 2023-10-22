@@ -234,10 +234,9 @@ int learn(int cmdlen) {
     // Reset the alarm
     alarm(0);
     // Update usage count for learned commands
-    for (int i = 0; cmdint[i] != -1; i++) {
-        wordinfo[cmdint[i]][i] += lrnval;
+	for (int i = 0; i <= cmdlen; i++) {
+         wordinfo[cmdint[i]][i] += lrnval;
     }
-
     int status;
     
     waitpid(child_pid, &status, 0);
