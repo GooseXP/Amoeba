@@ -263,8 +263,10 @@ void writedb() {
         }
         fprintf(writeinfo, "\n");
     }
-}
 
+    fclose(writewrd);
+    fclose(writeinfo);
+}
 
 int main() {
     loaddb();
