@@ -118,9 +118,6 @@ void loaddb() {
 }
 
 void timeout_handler(int signum) {
-    // Handle the timeout here
-    // You can choose to kill the child process or perform other actions
-    // In this example, we will kill the child process
     if (child_pid > 0) {
         kill(child_pid, SIGKILL);
         child_pid = 0;
