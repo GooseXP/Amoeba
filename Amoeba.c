@@ -17,7 +17,7 @@ const int WRITEIVL = 10;
 
 // Define arrays for storing command strings and their usage info
 char wordarray[DBBUFFER][WRDBUFFER];
-int wordinfo[DBBUFFER][CMDMAX];
+long int wordinfo[DBBUFFER][CMDMAX];
 int dbloc = 0;
 time_t t;
 pid_t child_pid = 0;
@@ -74,50 +74,75 @@ void init() {
     pclose(cmdfile);
 }
 
-// Load the database from files if available, otherwise initialize it
-void loaddb() {
-    FILE *readwrd;
-    FILE *readinfo;
-    char line[WRDBUFFER];
-    char word[WRDBUFFER];
+// Write the database to files
+void writeDB() {
+    FILE *wordFile;
+    FILE *dataFile;
+    wordFile = fopen("words.csv", "w");
+    dataFile = fopen("worddata.csv", "w");
 
-    if ((readwrd = fopen("words.txt", "r")) && (readinfo = fopen("wordinfo.txt", "r")) ) {
-        int infoloc = 0;
-
-        while (fgets(line, sizeof(line), readwrd) != NULL) {
-            // Trim trailing newline character, if any
-            line[strcspn(line, "\n")] = '\0';
-            // Tokenize the line to extract words
-            int position = 0;
-            char *token = strtok(line, " \t\n");
-
-            while (token != NULL) {
-                // Add the word to the database
-                strcpy(wordarray[dbloc], token);
-                strcat(wordarray[dbloc], " ");
-                dbloc++;
-
-                // Read command usage info from the file
-                if (fscanf(readinfo, "%d", &wordinfo[infoloc][position]) != 1) {
-                    break;
-                }
-
-                token = strtok(NULL, " \t\n");
-                position++;
-            }
-
-            infoloc++;
-        }
-
-        fclose(readwrd);
-        fclose(readinfo);
-    } else {
-        // Database files don't exist, initialize the database
-        init();
+    for (int i = 0; i < dbloc; i++) {
+        fprintf(wordFile, "%s,", wordarray[i]);
     }
+    fclose(wordFile);
+
+    for (int i = 0; i < dbloc; i++) {
+        for (int j = 0; j < CMDMAX; j++) {
+            if (j > 0) {
+                fprintf(dataFile, ",");
+            }
+            fprintf(dataFile, "%ld", wordinfo[i][j]);
+        }
+        fprintf(dataFile, "\n");
+    }
+    fclose(dataFile);
+}
+
+// Load the database from files if available, otherwise initialize it
+void loadDB() {
+    int infoloc = 0;
+    int position = 0;
+    FILE *wordFile;
+    FILE *dataFile;
+
+ if ((wordFile = fopen("words.csv", "r"))) {
+        char line[WRDBUFFER];
+        while (fgets(line, sizeof(line), wordFile) != NULL) {
+            line[strcspn(line, "\n")] = '\0'; // Remove the trailing newline character
+            // Replace commas with spaces
+            for (size_t i = 0; i < strlen(line); i++) {
+                if (line[i] == ',') {
+                    line[i] = '\0';
+                }
+            }
+            strcpy(wordarray[dbloc], line);
+            dbloc++;
+        }
+        fclose(wordFile);
+    } else {
+        // Handle the case when "words.csv" doesn't exist
+        init();
+        return;
+    }
+
+    if ((dataFile = fopen("worddata.csv", "r"))){
+        while (infoloc < dbloc && fscanf(dataFile, "%ld", &wordinfo[dbloc][infoloc]) != EOF) {
+            position++;
+            if (position >= CMDMAX) {
+                position = 0;
+                infoloc++;
+            }
+        }
+        fclose(dataFile);
+    } else {
+	init();
+	}
 }
 
 void timeout_handler(int signum) {
+    // Handle the timeout here
+    // You can choose to kill the child process or perform other actions
+    // In this example, we will kill the child process
     if (child_pid > 0) {
         kill(child_pid, SIGKILL);
         child_pid = 0;
@@ -241,31 +266,11 @@ int learn(int cmdlen) {
     return lrnval;
 }
 
-// Write the database to files
-void writedb() {
-    FILE *writewrd;
-    FILE *writeinfo;
-    writewrd = fopen("words.txt", "w");
-    writeinfo = fopen("wordinfo.txt", "w");
-
-    // Write commands and usage info to files
-    for (int i = 0; i < dbloc; i++) {
-        fprintf(writewrd, "%s\n", wordarray[i]);
-        for (int j = 0; j < CMDMAX; j++) {
-            fprintf(writeinfo, "%d", wordinfo[i][j]);
-        }
-        fprintf(writeinfo, "\n");
-    }
-
-    fclose(writewrd);
-    fclose(writeinfo);
-}
-
 int main() {
-    loaddb();
+    loadDB();
     srand((unsigned)time(&t));
     int write = 0;
-    int length = 5;
+    int length = 1;
     int score = 0;
     int prevscore = 0;
     while (1) {
@@ -284,7 +289,7 @@ int main() {
 
         // Write the database to files at regular intervals
         if (write == WRITEIVL) {
-            writedb();
+            writeDB();
             write = 0;
         }
     }
