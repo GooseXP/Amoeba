@@ -140,12 +140,22 @@ void loadDB() {
 }
 
 void timeout_handler(int signum) {
-    // Handle the timeout here
-    // You can choose to kill the child process or perform other actions
-    // In this example, we will kill the child process
+    int kill_attempts = 0; // Not static
+
     if (child_pid > 0) {
-        kill(child_pid, SIGKILL);
-        child_pid = 0;
+        if (kill_attempts == 0) {
+            // First attempt - send SIGKILL
+            kill(child_pid, SIGKILL);
+            kill_attempts++;
+        } else if (kill_attempts == 1) {
+            // Second attempt - send another SIGKILL
+            kill(child_pid, SIGKILL);
+            kill_attempts++;
+        } else {
+            // Third attempt - give up
+            fprintf(stderr, "Failed to terminate the child process.\n");
+            exit(1); // Or take any other necessary action
+        }
     }
 }
 
