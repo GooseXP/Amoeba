@@ -26,7 +26,7 @@ pid_t child_pid = 0;
 void init() {
     int chridx = 0;
     char word[WRDBUFFER];
-    FILE *cmdfile = popen("ls /bin", "r");
+    FILE *cmdfile = popen("ls /bin && ls /sbin", "r");
     char cmdchr = '\0';
 
     while (cmdchr != EOF) {
@@ -207,7 +207,8 @@ int learn(int cmdlen) {
         // This is the child process
         close(pipefd[0]); // Close the read end of the pipe
         dup2(pipefd[1], 1); // Redirect stdout to the write end of the pipe
-        close(pipefd[1]); // Close the duplicated file descriptor
+        dup2(pipefd[1], 2); // Redirect stderr to the same pipe as stdout
+        close(pipefd[1]); // Close the duplicated file descriptors
 
         execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)0);
         // Exec failed
@@ -226,13 +227,13 @@ int learn(int cmdlen) {
     signal(SIGALRM, timeout_handler);
     alarm(TIMEOUT); // Set the alarm
 
-    // Read the contents of the pipe (stdout) directly into the output_buffer
+    // Read the contents of the pipe (stdout and stderr) directly into the output_buffer
     int output_index = 0;
     char current_char;
     while (read(pipefd[0], &current_char, 1) > 0) {
         output_buffer[output_index] = current_char;
         output_index++;
-
+		
         // Check for word boundaries and increment lrnval when a new word is added
         if ((current_char == ' ' || current_char == '\n') && chridx > 0) {
             word[chridx] = '\0';
@@ -265,6 +266,10 @@ int learn(int cmdlen) {
 
     // Reset the alarm
     alarm(0);
+
+	output_buffer[output_index] = '\0'; // Null-terminate the output
+	printf("%s", output_buffer);// Print the captured output (stdout and stderr)
+
     // Update usage count for learned commands
     for (int i = 0; i <= cmdlen; i++) {
         wordinfo[cmdint[i]][i] += lrnval;
