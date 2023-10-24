@@ -105,7 +105,7 @@ void loadDB() {
     FILE *wordFile;
     FILE *dataFile;
 
- if ((wordFile = fopen("words.csv", "r"))) {
+    if ((wordFile = fopen("words.csv", "r")) {
         char line[WRDBUFFER];
         while (fgets(line, sizeof(line), wordFile) != NULL) {
             line[strcspn(line, "\n")] = '\0'; // Remove the trailing newline character
@@ -125,7 +125,7 @@ void loadDB() {
         return;
     }
 
-    if ((dataFile = fopen("worddata.csv", "r"))){
+    if ((dataFile = fopen("worddata.csv", "r")) {
         while (infoloc < dbloc && fscanf(dataFile, "%ld", &wordinfo[dbloc][infoloc]) != EOF) {
             position++;
             if (position >= CMDMAX) {
@@ -135,8 +135,8 @@ void loadDB() {
         }
         fclose(dataFile);
     } else {
-	init();
-	}
+        init();
+    }
 }
 
 void timeout_handler(int signum) {
@@ -190,7 +190,7 @@ int learn(int cmdlen) {
 
     // Construct the command to execute
     for (int i = 0; cmdint[i] != -1; i++) {
-        strcat(cmd, wordarray[cmdint[i]]);
+        strcat(cmd, wordarray[cmdint[i]);
     }
 
     printf("\n$ %s\n", cmd);
@@ -233,7 +233,7 @@ int learn(int cmdlen) {
     while (read(pipefd[0], &current_char, 1) > 0) {
         output_buffer[output_index] = current_char;
         output_index++;
-		
+
         // Check for word boundaries and increment lrnval when a new word is added
         if ((current_char == ' ' || current_char == '\n') && chridx > 0) {
             word[chridx] = '\0';
@@ -267,15 +267,15 @@ int learn(int cmdlen) {
     // Reset the alarm
     alarm(0);
 
-	output_buffer[output_index] = '\0'; // Null-terminate the output
-	printf("%s", output_buffer);// Print the captured output (stdout and stderr)
+    output_buffer[output_index] = '\0'; // Null-terminate the output
+    printf("%s", output_buffer); // Print the captured output (stdout and stderr)
 
     // Update usage count for learned commands
     for (int i = 0; i <= cmdlen; i++) {
         wordinfo[cmdint[i]][i] += lrnval;
     }
     int status;
-    
+
     waitpid(child_pid, &status, 0);
 
     return lrnval;
@@ -308,6 +308,6 @@ int main() {
             write = 0;
         }
     }
-    
+
     return 0;
 }
