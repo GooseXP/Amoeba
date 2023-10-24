@@ -105,7 +105,7 @@ void loadDB() {
     FILE *wordFile;
     FILE *dataFile;
 
-    if ((wordFile = fopen("words.csv", "r")) {
+    if ((wordFile = fopen("words.csv", "r"))) {
         char line[WRDBUFFER];
         while (fgets(line, sizeof(line), wordFile) != NULL) {
             line[strcspn(line, "\n")] = '\0'; // Remove the trailing newline character
@@ -125,7 +125,7 @@ void loadDB() {
         return;
     }
 
-    if ((dataFile = fopen("worddata.csv", "r")) {
+    if ((dataFile = fopen("worddata.csv", "r"))) {
         while (infoloc < dbloc && fscanf(dataFile, "%ld", &wordinfo[dbloc][infoloc]) != EOF) {
             position++;
             if (position >= CMDMAX) {
@@ -190,7 +190,7 @@ int learn(int cmdlen) {
 
     // Construct the command to execute
     for (int i = 0; cmdint[i] != -1; i++) {
-        strcat(cmd, wordarray[cmdint[i]);
+        strcat(cmd, wordarray[cmdint[i]]);
     }
 
     printf("\n$ %s\n", cmd);
