@@ -100,6 +100,7 @@ void loadDB() {
   FILE *wordFile = NULL;
     FILE *dataFile = NULL;
     char line[WRDBUFFER];
+    
     // Open the files for reading
     wordFile = fopen("words.txt", "r");
     dataFile = fopen("worddata.csv", "r");
