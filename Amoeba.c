@@ -76,26 +76,23 @@ void init() {
 
 // Write the database to files
 void writeDB() {
-    FILE *wordFile;
-    FILE *dataFile;
-    wordFile = fopen("words.txt", "w");
-    dataFile = fopen("worddata.csv", "w");
+FILE *wordFile = fopen("words.txt", "w");
+    FILE *dataFile = fopen("worddata.csv", "w");
 
-    for (int i = 0; i < dbloc; i++) {
-        fprintf(wordFile, "%s\n", wordarray[i]);
-    }
-    fclose(wordFile);
-
-    for (int i = 0; i < dbloc; i++) {
-        for (int j = 0; j < CMDMAX; j++) {
-            if (j > 0) {
-                fprintf(dataFile, ",");
+    if (wordFile && dataFile) {
+        for (int i = 0; i < dbloc; i++) {
+            fprintf(wordFile, "%s\n", wordarray[i]);
+            for (int j = 0; j < CMDMAX; j++) {
+                fprintf(dataFile, "%ld,", wordinfo[i][j]);
             }
-            fprintf(dataFile, "%ld", wordinfo[i][j]);
+            fprintf(dataFile, "\n");
         }
-        fprintf(dataFile, "\n");
+
+        fclose(wordFile);
+        fclose(dataFile);
+    } else {
+        perror("Failed to open files for writing.");
     }
-    fclose(dataFile);
 }
 
 // Load the database from files if available, otherwise initialize it
@@ -120,7 +117,7 @@ void loadDB() {
         int position = 0;
         while (infoloc < dbloc) {
         	if (position <= CMDMAX) {
-			fscanf(dataFile, "%ld,", &wordinfo[infoloc][position]);
+				fscanf(dataFile, "%ld,", &wordinfo[infoloc][position]);
             	position++;
             }else{
 				position = 0;
