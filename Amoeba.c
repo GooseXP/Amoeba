@@ -106,7 +106,7 @@ void loadDB() {
     FILE *dataFile;
 	char line[WRDBUFFER];
 
-    if ((wordFile = fopen("words.txt", "r")) && (dataFile = fopen("wordinfo.csv", "r"))) {
+    if ((wordFile = fopen("words.txt", "r")) && (dataFile = fopen("worddata.csv", "r"))) {
         while (fgets(line, sizeof(line), wordFile) != NULL) {
             // Trim trailing newline character, if any
             line[strcspn(line, "\n")] = '\0';
