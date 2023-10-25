@@ -112,7 +112,7 @@ void loadDB() {
         while (fgets(line, sizeof(line), wordFile) != NULL) {
             // Trim trailing newline character.
             line[strcspn(line, "\n")] = '\0';
-            strcpy(wordarray[dbloc], line); // Store the word directly
+            strcpy(wordarray[dbloc], line);
             dbloc++;
         }
 
