@@ -100,43 +100,40 @@ void writeDB() {
 
 // Load the database from files if available, otherwise initialize it
 void loadDB() {
-    int infoloc = 0;
-    int position = 0;
-    FILE *wordFile;
-    FILE *dataFile;
-	char line[WRDBUFFER];
+  FILE *wordFile = NULL;
+    FILE *dataFile = NULL;
+    char line[WRDBUFFER];
 
-    if ((wordFile = fopen("words.txt", "r")) && (dataFile = fopen("worddata.csv", "r"))) {
+    // Open the files for reading
+    wordFile = fopen("words.txt", "r");
+    dataFile = fopen("worddata.csv", "r");
+
+    if (wordFile && dataFile) {
         while (fgets(line, sizeof(line), wordFile) != NULL) {
-            // Trim trailing newline character, if any
+            // Trim trailing newline character.
             line[strcspn(line, "\n")] = '\0';
-            // Tokenize the line to extract words
-            int position = 0;
-            char *token = strtok(line, " \t\n");
-
-            while (token != NULL) {
-                // Add the word to the database
-                strcpy(wordarray[dbloc], token);
-                strcat(wordarray[dbloc], " ");
-                dbloc++;
+            strcpy(wordarray[dbloc], line); // Store the word directly
+            dbloc++;
         }
-        fclose(wordFile);
-    }
 
-        while (infoloc < dbloc && fscanf(dataFile, "%ld", &wordinfo[dbloc][infoloc]) != EOF) {
-            position++;
-            if (position >= CMDMAX) {
-                position = 0;
+        int infoloc = 0;
+        int position = 0;
+        while (infoloc < dbloc) {
+        	if (position <= CMDMAX) {
+				fscanf(dataFile, "%ld,", &wordinfo[infoloc][position]);
+            	position++;
+            }else{
+				position = 0;
                 infoloc++;
-            }
+			}
         }
+		fclose(wordFile);
         fclose(dataFile);
     } else {
-    	// Handle the case when "words or wordsinfo" doesn't exist
+        // Handle the case when "words.txt" or "worddata.csv" doesn't exist
         init();
     }
 }
-
 void timeout_handler(int signum) {
     int kill_attempts = 0; // Not static
 
