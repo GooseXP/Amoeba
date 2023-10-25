@@ -78,11 +78,11 @@ void init() {
 void writeDB() {
     FILE *wordFile;
     FILE *dataFile;
-    wordFile = fopen("words.csv", "w");
+    wordFile = fopen("words.txt", "w");
     dataFile = fopen("worddata.csv", "w");
 
     for (int i = 0; i < dbloc; i++) {
-        fprintf(wordFile, "%s,", wordarray[i]);
+        fprintf(wordFile, "%s\n", wordarray[i]);
     }
     fclose(wordFile);
 
@@ -104,28 +104,25 @@ void loadDB() {
     int position = 0;
     FILE *wordFile;
     FILE *dataFile;
+	char line[WRDBUFFER];
 
-    if ((wordFile = fopen("words.csv", "r"))) {
-        char line[WRDBUFFER];
+    if ((wordFile = fopen("words.txt", "r")) && (dataFile = fopen("wordinfo.csv", "r"))) {
         while (fgets(line, sizeof(line), wordFile) != NULL) {
-            line[strcspn(line, "\n")] = '\0'; // Remove the trailing newline character
-            // Replace commas with spaces
-            for (size_t i = 0; i < strlen(line); i++) {
-                if (line[i] == ',') {
-                    line[i] = '\0';
-                }
-            }
-            strcpy(wordarray[dbloc], line);
-            dbloc++;
+            // Trim trailing newline character, if any
+            line[strcspn(line, "\n")] = '\0';
+            // Tokenize the line to extract words
+            int position = 0;
+            char *token = strtok(line, " \t\n");
+
+            while (token != NULL) {
+                // Add the word to the database
+                strcpy(wordarray[dbloc], token);
+                strcat(wordarray[dbloc], " ");
+                dbloc++;
         }
         fclose(wordFile);
-    } else {
-        // Handle the case when "words.csv" doesn't exist
-        init();
-        return;
     }
 
-    if ((dataFile = fopen("worddata.csv", "r"))) {
         while (infoloc < dbloc && fscanf(dataFile, "%ld", &wordinfo[dbloc][infoloc]) != EOF) {
             position++;
             if (position >= CMDMAX) {
@@ -135,6 +132,7 @@ void loadDB() {
         }
         fclose(dataFile);
     } else {
+    	// Handle the case when "words or wordsinfo" doesn't exist
         init();
     }
 }
