@@ -130,7 +130,8 @@ void timeout_handler(int signum) {
     if (child_pid > 0) {
         if (kill_attempts == 0) {
             // First attempt - send SIGKILL
-            kill(child_pid, SIGKILL);
+            kill(child_pid, SIGTERM);
+            sleep(2);
             kill_attempts++;
         } else if (kill_attempts == 1) {
             // Second attempt - send another SIGKILL
