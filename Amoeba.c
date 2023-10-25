@@ -278,7 +278,7 @@ int main() {
         score = learn(length);
 
         if (score >= prevscore) {
-            if (length <= CMDMAX) {
+            if (length < CMDMAX) {
                 length += rand() % 2;
             }
         } else if (length > 1) {
