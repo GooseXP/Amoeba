@@ -100,7 +100,6 @@ void loadDB() {
   FILE *wordFile = NULL;
     FILE *dataFile = NULL;
     char line[WRDBUFFER];
-
     // Open the files for reading
     wordFile = fopen("words.txt", "r");
     dataFile = fopen("worddata.csv", "r");
@@ -110,19 +109,12 @@ void loadDB() {
             // Trim trailing newline character.
             line[strcspn(line, "\n")] = '\0';
             strcpy(wordarray[dbloc], line);
-            dbloc++;
-        }
-
-        int infoloc = 0;
-        int position = 0;
-        while (infoloc < dbloc) {
-        	if (position <= CMDMAX) {
-				fscanf(dataFile, "%ld,", &wordinfo[infoloc][position]);
-            	position++;
-            }else{
-				position = 0;
-                infoloc++;
+         	int position = 0;
+			while (position < CMDMAX) {
+					fscanf(dataFile, "%ld,", &wordinfo[dbloc][position]);
+		        	position++;
 			}
+            dbloc++;
         }
 		fclose(wordFile);
         fclose(dataFile);
