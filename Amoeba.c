@@ -120,7 +120,7 @@ void loadDB() {
         int position = 0;
         while (infoloc < dbloc) {
         	if (position <= CMDMAX) {
-				fscanf(dataFile, "%ld,", &wordinfo[infoloc][position]);
+			fscanf(dataFile, "%ld,", &wordinfo[infoloc][position]);
             	position++;
             }else{
 				position = 0;
