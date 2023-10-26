@@ -11,7 +11,7 @@
 #define WRDBUFFER 100
 #define CMDMAX 10 //set the maximum number of commands to enter
 #define TIMEOUT 2 // Set the timeout in seconds
-#define NORMTHLD 10 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
+#define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 
 // Set the interval for writing the database to files
 const int WRITEIVL = 10;
