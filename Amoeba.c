@@ -9,8 +9,9 @@
 // Define constants for database and buffer sizes
 #define DBBUFFER 1000000
 #define WRDBUFFER 100
-#define CMDMAX 10
+#define CMDMAX 10 //set the maximum number of commands to enter
 #define TIMEOUT 2 // Set the timeout in seconds
+#define NORMTHLD 10 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 
 // Set the interval for writing the database to files
 const int WRITEIVL = 10;
@@ -145,6 +146,40 @@ void timeout_handler(int signum) {
     }
 }
 
+//Normalize the data
+void normalize() {
+    int overall_scores = 0;
+    for (int i = 0; i < dbloc; i++) {
+        for (int j = 0; j < CMDMAX; j++) {
+            overall_scores += wordinfo[i][j];
+        }
+    }
+    
+    int overall_average = overall_scores / (dbloc * CMDMAX);  // Calculate the overall average score
+	printf("Overall average: %d", overall_average);
+    int select_items = 0;
+    int select_scores = 0;
+    for (int i = 0; i < dbloc; i++) {
+        for (int j = 0; j < CMDMAX; j++) {
+            if (wordinfo[i][j] > overall_average) {
+                select_scores += wordinfo[i][j];
+                select_items++;
+            }
+        }
+    }
+	int selectpct = (select_items * 1000) / (dbloc * (CMDMAX - 1)); //tenth of a percent of items with above average scores
+    if (selectpct >= NORMTHLD) {
+        int select_average = select_scores / select_items; // Calculate the average of scores greater than the overall average
+        for (int i = 0; i < dbloc; i++) {
+            for (int j = 0; j < CMDMAX; j++) {
+                if (wordinfo[i][j] < select_average) {
+                    wordinfo[i][j] = select_average;  // Normalize the score to the average of select_scores
+                }
+            }
+        }
+    }
+}
+
 // Learn from commands and update the database
 int learn(int cmdlen) {
     int chridx = 0;
@@ -260,8 +295,9 @@ int learn(int cmdlen) {
     for (int i = 0; i <= cmdlen; i++) {
         wordinfo[cmdint[i]][i] += lrnval;
     }
+	normalize();	
+	    
     int status;
-
     waitpid(child_pid, &status, 0);
 
     return lrnval;
