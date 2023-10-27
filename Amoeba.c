@@ -12,6 +12,8 @@
 #define CMDMAX 10 //set the maximum number of commands to enter
 #define TIMEOUT 2 // Set the timeout in seconds
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
+#define REWARD 10
+#define PUNISHMENT 1
 
 // Set the interval for writing the database to files
 const int WRITEIVL = 10;
@@ -156,7 +158,6 @@ void normalize() {
     }
     
     int overall_average = overall_scores / (dbloc * CMDMAX);  // Calculate the overall average score
-	printf("Overall average: %d", overall_average);
     int select_items = 0;
     int select_scores = 0;
     for (int i = 0; i < dbloc; i++) {
@@ -274,9 +275,9 @@ int learn(int cmdlen) {
                     wordinfo[dbloc][i] = 0;
                 }
                 dbloc++;
-                lrnval++;
+                lrnval += REWARD;
             } else{
-				lrnval--;			
+				lrnval -= PUNISHMENT;			
 			}
 
             chridx = 0;
