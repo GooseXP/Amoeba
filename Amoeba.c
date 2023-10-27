@@ -275,7 +275,9 @@ int learn(int cmdlen) {
                 }
                 dbloc++;
                 lrnval++;
-            }
+            } else{
+				lrnval--;			
+			}
 
             chridx = 0;
         } else {
