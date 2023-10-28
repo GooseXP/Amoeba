@@ -129,7 +129,6 @@ void loadDB() {
 }
 
 void timeout_handler() {
-	printf("\nkill attempts %d\n", kill_attempts);
     if (kill_attempts == 0) {
         // First attempt - send SIGTERM
         kill(child_pid, SIGTERM);
