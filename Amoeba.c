@@ -146,6 +146,8 @@ void timeout_handler(int signum) {
     } else {
         // Reset kill_attempts if there is no active child process
         kill_attempts = 0;
+		// Reset the alarm
+		alarm(0);
     }
 }
 
@@ -289,9 +291,6 @@ int learn(int cmdlen) {
     }
     close(pipefd[0]);
 
-    // Reset the alarm
-    alarm(0);
-
     output_buffer[output_index] = '\0'; // Null-terminate the output
     printf("%s", output_buffer); // Print the captured output (stdout and stderr)
 
@@ -302,7 +301,7 @@ int learn(int cmdlen) {
 	normalize();	
 	    
     int status;
-    waitpid(child_pid, &status, 0);
+
 	child_pid = 0;
 
     return lrnval;
