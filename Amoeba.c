@@ -135,7 +135,7 @@ void timeout_handler(int signum) {
             // First attempt - send SIGTERM
             kill(child_pid, SIGTERM);
         } else if (kill_attempts == 1) {
-            // Second attempt - send another SIGTERM
+            // Second attempt - send SIGKILL
             kill(child_pid, SIGKILL);
         } else if (kill_attempts == 2) {
             // Third attempt - give up
