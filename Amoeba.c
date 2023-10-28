@@ -13,7 +13,7 @@
 #define TIMEOUT 2 // Set the timeout in seconds
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 #define REWARD 10
-#define PUNISHMENT 1
+#define PENALTY 1
 
 // Set the interval for writing the database to files
 const int WRITEIVL = 10;
@@ -128,23 +128,24 @@ void loadDB() {
     }
 }
 void timeout_handler(int signum) {
-    int kill_attempts = 0; // Not static
+    static int kill_attempts = 0;  // Declare a static variable to track kill attempts
 
     if (child_pid > 0) {
         if (kill_attempts == 0) {
-            // First attempt - send SIGKILL
+            // First attempt - send SIGTERM
             kill(child_pid, SIGTERM);
-            sleep(2);
-            kill_attempts++;
         } else if (kill_attempts == 1) {
-            // Second attempt - send another SIGKILL
-            kill(child_pid, SIGKILL);
-            kill_attempts++;
-        } else {
+            // Second attempt - send another SIGTERM
+            kill(child_pid, SIGTERM);
+        } else if (kill_attempts == 2) {
             // Third attempt - give up
             fprintf(stderr, "Failed to terminate the child process.\n");
             exit(1); // Or take any other necessary action
         }
+        kill_attempts++;
+    } else {
+        // Reset kill_attempts if there is no active child process
+        kill_attempts = 0;
     }
 }
 
@@ -277,7 +278,7 @@ int learn(int cmdlen) {
                 dbloc++;
                 lrnval += REWARD;
             } else{
-				lrnval -= PUNISHMENT;			
+				lrnval -= PENALTY;			
 			}
 
             chridx = 0;
