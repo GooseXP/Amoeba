@@ -133,21 +133,25 @@ void timeout_handler() {
         // First attempt - send SIGTERM
         kill(child_pid, SIGTERM);
     } else if (kill_attempts == 1) {
-        // Second attempt - send SIGKILL
-        kill(child_pid, SIGKILL);
+		// Second attempt - send SIGQUIT
+		kill(child_pid, SIGQUIT);
     } else if (kill_attempts == 2) {
+		// Third attempt - send SIGKILL
+		kill(child_pid, SIGKILL);
+    } else if (kill_attempts == 3) {
         // Third attempt - give up
         fprintf(stderr, "Failed to terminate the child process.\n");
-        exit(1); // Or take any other necessary action
+        exit(1);
     }
-        kill_attempts++;
-    }
+	kill_attempts++;
+}
     
 // Function to check the status of the child process and handle timeouts
 void check_child_status() {
     int status;
-    pid_t result = waitpid(child_pid, &status, WNOHANG);
-
+    pid_t result;
+    while(1){
+    result = waitpid(child_pid, &status, WNOHANG);
     if (result == -1) {
         // Print the error message to stderr
         perror("waitpid error");
@@ -156,17 +160,11 @@ void check_child_status() {
         // Child process has terminated, take appropriate action
         child_pid = 0;  // Reset child_pid
         kill_attempts = 0; // Reset kill_attempts
+        return;
     } else {
-    		int timer = 0;
-			while (timer < TIMEOUT) {
-            sleep(1);
-            timer++;
-            if (timer >= TIMEOUT) {
-                // Timer has exceeded the timeout, call the timeout handler
-                timeout_handler();
-				timer =  0;
-        	}
-    	}
+    	sleep(TIMEOUT);
+		timeout_handler();
+		}
 	}
 }
 //Normalize the data
@@ -265,10 +263,9 @@ int learn(int cmdlen) {
 
     // Close the write end of the pipe in the parent
     close(pipefd[1]);
-
-    // Set a timeout for the command execution
-    signal(SIGALRM, timeout_handler);
-    alarm(TIMEOUT); // Set the alarm
+    
+    // Check child process status before reading data
+    check_child_status();
 
     // Read the contents of the pipe (stdout and stderr) directly into the output_buffer
     int output_index = 0;
@@ -316,7 +313,6 @@ int learn(int cmdlen) {
     for (int i = 0; i <= cmdlen; i++) {
         wordinfo[cmdint[i]][i] += lrnval;
     }
-	check_child_status();
 	normalize();
     return lrnval;
 }
