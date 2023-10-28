@@ -136,7 +136,7 @@ void timeout_handler(int signum) {
             kill(child_pid, SIGTERM);
         } else if (kill_attempts == 1) {
             // Second attempt - send another SIGTERM
-            kill(child_pid, SIGTERM);
+            kill(child_pid, SIGKILL);
         } else if (kill_attempts == 2) {
             // Third attempt - give up
             fprintf(stderr, "Failed to terminate the child process.\n");
