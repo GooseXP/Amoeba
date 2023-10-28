@@ -303,6 +303,7 @@ int learn(int cmdlen) {
 	    
     int status;
     waitpid(child_pid, &status, 0);
+	child_pid = 0;
 
     return lrnval;
 }
