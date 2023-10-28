@@ -10,7 +10,7 @@
 #define DBBUFFER 1000000
 #define WRDBUFFER 100
 #define CMDMAX 10 //set the maximum number of commands to enter
-#define TIMEOUT 2 // Set the timeout in seconds
+#define TIMEOUT 5 // Set the timeout in seconds
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 #define REWARD 10 //set reward for learning new data
 #define PENALTY 1 //Set penalty for recieving redundant data
@@ -129,6 +129,7 @@ void loadDB() {
 }
 
 void timeout_handler() {
+	printf("\nkill attempts %d\n", kill_attempts);
     if (kill_attempts == 0) {
         // First attempt - send SIGTERM
         kill(child_pid, SIGTERM);
@@ -149,6 +150,7 @@ void timeout_handler() {
 // Function to check the status of the child process and handle timeouts
 void check_child_status() {
     int status;
+    int timer = 0;
     pid_t result;
     while(1){
     result = waitpid(child_pid, &status, WNOHANG);
@@ -162,8 +164,12 @@ void check_child_status() {
         kill_attempts = 0; // Reset kill_attempts
         return;
     } else {
-    	sleep(TIMEOUT);
-		timeout_handler();
+    	timer++;
+		usleep(1);
+		if(timer >= (TIMEOUT* 1000000)){
+			timeout_handler();
+			timer = 0;
+			}
 		}
 	}
 }
