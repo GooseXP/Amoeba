@@ -164,8 +164,8 @@ void check_child_status() {
         return;
     } else {
     	timer++;
-		usleep(1);
-		if(timer >= (TIMEOUT* 1000000)){
+		sleep(1);
+		if(timer >= TIMEOUT{
 			timeout_handler();
 			timer = 0;
 			}
