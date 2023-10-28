@@ -165,7 +165,7 @@ void check_child_status() {
     } else {
     	timer++;
 		sleep(1);
-		if(timer >= TIMEOUT{
+		if(timer >= TIMEOUT) {
 			timeout_handler();
 			timer = 0;
 			}
