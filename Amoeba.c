@@ -147,7 +147,7 @@ void timeout_handler(int signum) {
         // Reset kill_attempts if there is no active child process
         kill_attempts = 0;
 		// Reset the alarm
-		alarm(0);
+    	alarm(0);
     }
 }
 
@@ -301,7 +301,7 @@ int learn(int cmdlen) {
 	normalize();	
 	    
     int status;
-
+    waitpid(child_pid, &status, 0);
 	child_pid = 0;
 
     return lrnval;
