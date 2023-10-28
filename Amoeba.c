@@ -12,16 +12,16 @@
 #define CMDMAX 10 //set the maximum number of commands to enter
 #define TIMEOUT 2 // Set the timeout in seconds
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
-#define REWARD 10
-#define PENALTY 1
+#define REWARD 10 //set reward for learning new data
+#define PENALTY 1 //Set penalty for recieving redundant data
+#define WRITEIVL 10 // Set the interval for writing the database to files
 
-// Set the interval for writing the database to files
-const int WRITEIVL = 10;
 
 // Define arrays for storing command strings and their usage info
 char wordarray[DBBUFFER][WRDBUFFER];
 long int wordinfo[DBBUFFER][CMDMAX];
 int dbloc = 0;
+int kill_attempts = 0;
 time_t t;
 pid_t child_pid = 0;
 
@@ -127,30 +127,48 @@ void loadDB() {
         init();
     }
 }
-void timeout_handler(int signum) {
-    static int kill_attempts = 0;  // Declare a static variable to track kill attempts
 
-    if (child_pid > 0) {
-        if (kill_attempts == 0) {
-            // First attempt - send SIGTERM
-            kill(child_pid, SIGTERM);
-        } else if (kill_attempts == 1) {
-            // Second attempt - send SIGKILL
-            kill(child_pid, SIGKILL);
-        } else if (kill_attempts == 2) {
-            // Third attempt - give up
-            fprintf(stderr, "Failed to terminate the child process.\n");
-            exit(1); // Or take any other necessary action
-        }
-        kill_attempts++;
-    } else {
-        // Reset kill_attempts if there is no active child process
-        kill_attempts = 0;
-		// Reset the alarm
-    	alarm(0);
+void timeout_handler() {
+    if (kill_attempts == 0) {
+        // First attempt - send SIGTERM
+        kill(child_pid, SIGTERM);
+    } else if (kill_attempts == 1) {
+        // Second attempt - send SIGKILL
+        kill(child_pid, SIGKILL);
+    } else if (kill_attempts == 2) {
+        // Third attempt - give up
+        fprintf(stderr, "Failed to terminate the child process.\n");
+        exit(1); // Or take any other necessary action
     }
-}
+        kill_attempts++;
+    }
+    
+// Function to check the status of the child process and handle timeouts
+void check_child_status() {
+    int status;
+    pid_t result = waitpid(child_pid, &status, WNOHANG);
 
+    if (result == -1) {
+        // Print the error message to stderr
+        perror("waitpid error");
+        exit(1); // Exit the program due to the error
+    } else if (result > 0) {
+        // Child process has terminated, take appropriate action
+        child_pid = 0;  // Reset child_pid
+        kill_attempts = 0; // Reset kill_attempts
+    } else {
+    		int timer = 0;
+			while (timer < TIMEOUT) {
+            sleep(1);
+            timer++;
+            if (timer >= TIMEOUT) {
+                // Timer has exceeded the timeout, call the timeout handler
+                timeout_handler();
+				timer =  0;
+        	}
+    	}
+	}
+}
 //Normalize the data
 void normalize() {
     int overall_scores = 0;
@@ -237,11 +255,11 @@ int learn(int cmdlen) {
 
         execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)0);
         // Exec failed
-        perror("execl");
+        perror("execl failue");
         exit(1);
     } else if (child_pid < 0) {
         // Handle fork failure
-        perror("fork");
+        perror("fork failure");
         exit(1);
     }
 
@@ -298,12 +316,8 @@ int learn(int cmdlen) {
     for (int i = 0; i <= cmdlen; i++) {
         wordinfo[cmdint[i]][i] += lrnval;
     }
-	normalize();	
-	    
-    int status;
-    waitpid(child_pid, &status, 0);
-	child_pid = 0;
-
+	check_child_status();
+	normalize();
     return lrnval;
 }
 
