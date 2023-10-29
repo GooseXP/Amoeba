@@ -127,47 +127,60 @@ void loadDB() {
         init();
     }
 }
-
-void timeout_handler() {
-    if (kill_attempts == 0) {
-        // First attempt - send SIGTERM
-        kill(child_pid, SIGTERM);
-    } else if (kill_attempts == 1) {
-		// Wait two seconds, and check
-		sleep(2);
-	} else if (kill_attempts == 2) {
-		// Second attempt - send SIGKILL
-		kill(child_pid, SIGKILL);
-	} else if (kill_attempts == 3) {
-		// Wait two seconds, and check
-		sleep(2);
-    } else if (kill_attempts == 4) {
-        // Third attempt - give up
-        fprintf(stderr, "Failed to terminate the child process.\n");
-        exit(1);
-    }
-	kill_attempts++;
-}
     
 // Function to check the status of the child process and handle timeouts
 void check_child_status() {
     int status;
-    if (child_pid > 0) {
-        // Set an alarm to handle timeouts
-        signal(SIGALRM, timeout_handler);
-        alarm(TIMEOUT);
+    int result;
+    time_t start_time, current_time;
+    time(&start_time);
+    int kill_attempts = 0;
 
-        // Wait for the child process and store its status
-        int proc_stat = waitpid(child_pid, &status, 0);
-        
-        // If the wait succeeds, cancel the alarm
-        if (proc_stat > 0) {
-            alarm(0);
+    while (1) {
+        result = waitpid(child_pid, &status, WNOHANG);
+        time(&current_time);
+        int proc_time = difftime(current_time, start_time);
+
+        if (result == 0 && proc_time >= TIMEOUT) {
+            // Child process is still running, and a timeout has occurred
+            if (kill_attempts == 0) {
+                // First attempt - send SIGTERM
+                if (kill(child_pid, SIGTERM) == 0) {
+                	sleep(1);
+                    kill_attempts++;
+                } else {
+                    // Handle the case when kill returns an error
+                    perror("kill error");
+					kill_attempts++;
+                }
+            } else if (kill_attempts == 1) {
+                // Second attempt - send SIGKILL
+                if (kill(child_pid, SIGKILL) == 0) {
+					sleep(1);
+                    kill_attempts++;
+                } else {
+                	perror("kill error");
+                    kill_attempts++;
+                }
+            } else if (kill_attempts == 2) {
+                // Third attempt - give up
+                fprintf(stderr, "Failed to terminate the child process.\n");
+                exit(1);
+            }
+            
+        } else if (result > 0) {
+            // Child process has terminated
             child_pid = 0;  // Reset child_pid
             kill_attempts = 0; // Reset kill_attempts
+            break; // Exit the loop
+        } else if (result < 0) {
+            // Handle the case when waitpid returns an error
+            perror("waitpid error");
+            break; // Exit the loop
         }
     }
 }
+
 //Normalize the data
 void normalize() {
     int overall_scores = 0;
