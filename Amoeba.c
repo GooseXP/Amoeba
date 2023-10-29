@@ -10,7 +10,8 @@
 #define DBBUFFER 1000000
 #define WRDBUFFER 100
 #define CMDMAX 10 //set the maximum number of commands to enter
-#define TIMEOUT 3 // Set the timeout in seconds
+#define RUNTIME 3 // Set the process runtime in seconds
+#define TIMEOUT 30 //Timeout if child process locks waitpid
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 #define REWARD 10 //set reward for learning new data
 #define PENALTY 1 //Set penalty for recieving redundant data
@@ -21,7 +22,6 @@
 char wordarray[DBBUFFER][WRDBUFFER];
 long int wordinfo[DBBUFFER][CMDMAX];
 int dbloc = 0;
-int kill_attempts = 0;
 time_t t;
 pid_t child_pid = 0;
 
@@ -127,51 +127,52 @@ void loadDB() {
         init();
     }
 }
-    
-// Function to check the status of the child process and handle timeouts
+
+//Handle timeout if waitpid locks up
+void timeout_handler() {
+	perror("Waitpid error, child process does not respond");
+	exit(1);
+}
+  
+// Function to check the status of the child process and handle RUNTIMEs
 void check_child_status() {
     int status;
     int result;
     time_t start_time, current_time;
     time(&start_time);
     int kill_attempts = 0;
-
+	signal(SIGALRM, timeout_handler);
+	alarm(TIMEOUT);
     while (1) {
         result = waitpid(child_pid, &status, WNOHANG);
         time(&current_time);
         int proc_time = difftime(current_time, start_time);
 
-        if (result == 0 && proc_time >= TIMEOUT) {
-            // Child process is still running, and a timeout has occurred
+        if (result == 0 && proc_time >= RUNTIME) {
+            // Child process is still running, and a process time has exceeded maximum.
             if (kill_attempts == 0) {
                 // First attempt - send SIGTERM
                 if (kill(child_pid, SIGTERM) == 0) {
-                	sleep(1);
-                    kill_attempts++;
                 } else {
-                    // Handle the case when kill returns an error
                     perror("kill error");
-					kill_attempts++;
                 }
             } else if (kill_attempts == 1) {
                 // Second attempt - send SIGKILL
                 if (kill(child_pid, SIGKILL) == 0) {
-			sleep(1);
-                    kill_attempts++;
                 } else {
                 	perror("kill error");
-                    kill_attempts++;
                 }
             } else if (kill_attempts == 2) {
                 // Third attempt - give up
                 fprintf(stderr, "Failed to terminate the child process.\n");
                 exit(1);
             }
-            
+            sleep(1);
+        	kill_attempts++;
         } else if (result > 0) {
             // Child process has terminated
             child_pid = 0;  // Reset child_pid
-            kill_attempts = 0; // Reset kill_attempts
+			alarm(0); //reset the alarm
             break; // Exit the loop
         } else if (result < 0) {
             // Handle the case when waitpid returns an error
