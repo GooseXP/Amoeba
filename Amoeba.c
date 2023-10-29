@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <limits.h>
 
 // Define constants for database and buffer sizes
 #define DBBUFFER 1000000
@@ -22,7 +23,6 @@
 char wordarray[DBBUFFER][WRDBUFFER];
 long int wordinfo[DBBUFFER][CMDMAX];
 int dbloc = 0;
-time_t t;
 pid_t child_pid = 0;
 
 // Initialize the database with common Linux commands
@@ -130,8 +130,20 @@ void loadDB() {
 
 //Handle timeout if waitpid locks up
 void timeout_handler() {
-	perror("Waitpid error, child process does not respond");
-	exit(1);
+	//restart the whole enchilada
+	perror("Process hung, attempting to restart");
+	char AmoebaPath[PATH_MAX];
+    ssize_t pathLength = readlink("/proc/self/exe", AmoebaPath, sizeof(AmoebaPath) - 1);
+
+    if (pathLength != -1) {
+        AmoebaPath[pathLength] = '\0';
+        printf("Path to the executable: %s\n", AmoebaPath);
+    } else {
+        perror("readlink");
+    }
+    execl(AmoebaPath, AmoebaPath, NULL);
+
+    perror("exec failed to restart the process");
 }
   
 // Function to check the status of the child process and handle RUNTIMEs
@@ -141,8 +153,6 @@ void check_child_status() {
     time_t start_time, current_time;
     time(&start_time);
     int kill_attempts = 0;
-	signal(SIGALRM, timeout_handler);
-	alarm(TIMEOUT);
     while (1) {
         result = waitpid(child_pid, &status, WNOHANG);
         time(&current_time);
@@ -172,7 +182,6 @@ void check_child_status() {
         } else if (result > 0) {
             // Child process has terminated
             child_pid = 0;  // Reset child_pid
-			alarm(0); //reset the alarm
             break; // Exit the loop
         } else if (result < 0) {
             // Handle the case when waitpid returns an error
@@ -334,12 +343,16 @@ int learn(int cmdlen) {
 
 int main() {
     loadDB();
-    srand((unsigned)time(&t));
+	time_t init_time;
+    srand((unsigned)time(&init_time));
     int write = 0;
     int length = 1;
     int score = 0;
     int prevscore = 0;
-    while (1) {
+    
+	signal(SIGALRM, timeout_handler);	
+	while (1) {
+		alarm(TIMEOUT);
         // Learn and adapt command length based on performance
         score = learn(length);
 
