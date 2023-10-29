@@ -10,7 +10,7 @@
 #define DBBUFFER 1000000
 #define WRDBUFFER 100
 #define CMDMAX 10 //set the maximum number of commands to enter
-#define TIMEOUT 1 // Set the timeout in seconds
+#define TIMEOUT 3 // Set the timeout in seconds
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 #define REWARD 10 //set reward for learning new data
 #define PENALTY 1 //Set penalty for recieving redundant data
