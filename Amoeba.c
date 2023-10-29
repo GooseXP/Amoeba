@@ -156,7 +156,7 @@ void check_child_status() {
             } else if (kill_attempts == 1) {
                 // Second attempt - send SIGKILL
                 if (kill(child_pid, SIGKILL) == 0) {
-					sleep(1);
+			sleep(1);
                     kill_attempts++;
                 } else {
                 	perror("kill error");
