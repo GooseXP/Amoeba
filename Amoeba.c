@@ -10,7 +10,7 @@
 #define DBBUFFER 1000000
 #define WRDBUFFER 100
 #define CMDMAX 10 //set the maximum number of commands to enter
-#define TIMEOUT 5 // Set the timeout in seconds
+#define TIMEOUT 1 // Set the timeout in seconds
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 #define REWARD 10 //set reward for learning new data
 #define PENALTY 1 //Set penalty for recieving redundant data
@@ -133,12 +133,15 @@ void timeout_handler() {
         // First attempt - send SIGTERM
         kill(child_pid, SIGTERM);
     } else if (kill_attempts == 1) {
-		// Second attempt - send SIGQUIT
-		kill(child_pid, SIGQUIT);
-    } else if (kill_attempts == 2) {
-		// Third attempt - send SIGKILL
+		// Wait two seconds, and check
+		sleep(2);
+	} else if (kill_attempts == 2) {
+		// Second attempt - send SIGKILL
 		kill(child_pid, SIGKILL);
-    } else if (kill_attempts == 3) {
+	} else if (kill_attempts == 3) {
+		// Wait two seconds, and check
+		sleep(2);
+    } else if (kill_attempts == 4) {
         // Third attempt - give up
         fprintf(stderr, "Failed to terminate the child process.\n");
         exit(1);
@@ -149,28 +152,21 @@ void timeout_handler() {
 // Function to check the status of the child process and handle timeouts
 void check_child_status() {
     int status;
-    int timer = 0;
-    pid_t result;
-    while(1){
-    result = waitpid(child_pid, &status, WNOHANG);
-    if (result == -1) {
-        // Print the error message to stderr
-        perror("waitpid error");
-        exit(1); // Exit the program due to the error
-    } else if (result > 0) {
-        // Child process has terminated, take appropriate action
-        child_pid = 0;  // Reset child_pid
-        kill_attempts = 0; // Reset kill_attempts
-        return;
-    } else {
-    	timer++;
-		sleep(1);
-		if(timer >= TIMEOUT) {
-			timeout_handler();
-			timer = 0;
-			}
-		}
-	}
+    if (child_pid > 0) {
+        // Set an alarm to handle timeouts
+        signal(SIGALRM, timeout_handler);
+        alarm(TIMEOUT);
+
+        // Wait for the child process and store its status
+        int proc_stat = waitpid(child_pid, &status, 0);
+        
+        // If the wait succeeds, cancel the alarm
+        if (proc_stat > 0) {
+            alarm(0);
+            child_pid = 0;  // Reset child_pid
+            kill_attempts = 0; // Reset kill_attempts
+        }
+    }
 }
 //Normalize the data
 void normalize() {
