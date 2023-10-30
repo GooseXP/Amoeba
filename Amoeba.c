@@ -12,7 +12,7 @@
 #define WRDBUFFER 100
 #define CMDMAX 10 //set the maximum number of commands to enter
 #define RUNTIME 3 // Set the process runtime in seconds
-#define TIMEOUT 30 //Timeout if child process locks waitpid
+#define TIMEOUT 10 //Timeout if child process locks waitpid
 #define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
 #define REWARD 10 //set reward for learning new data
 #define PENALTY 1 //Set penalty for recieving redundant data
