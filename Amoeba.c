@@ -12,8 +12,8 @@
 #define WRDBUFFER 100
 #define CMDMAX 10 //set the maximum number of commands to enter
 #define RUNTIME 3 // Set the process runtime in seconds
-#define TIMEOUT 10 //Timeout if child process locks waitpid
-#define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
+#define TIMEOUT 30 //Timeout if child process locks waitpid
+#define NORMTHLD 250 //Set the threshold for items greater than the average before normalization occurs
 #define REWARD 10 //set reward for learning new data
 #define PENALTY 1 //Set penalty for recieving redundant data
 #define WRITEIVL 10 // Set the interval for writing the database to files
@@ -211,8 +211,7 @@ void normalize() {
             }
         }
     }
-	int selectpct = (select_items * 1000) / (dbloc * (CMDMAX - 1)); //tenth of a percent of items with above average scores
-    if (selectpct >= NORMTHLD) {
+    if (select_items > NORMTHLD) {
         int select_average = select_scores / select_items; // Calculate the average of scores greater than the overall average
         for (int i = 0; i < dbloc; i++) {
             for (int j = 0; j < CMDMAX; j++) {
