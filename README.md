@@ -48,7 +48,7 @@ Amoeba stores learned data in two files:
 You can review these files to see the learned strings and their associated usage data. Periodically, the program will save the database to these files.
 
 Running in a Virtual Machine (Optional)
-To best isolate the program from sensitive data it may be best to run it within a virtualmachine.
+- To best isolate the program from sensitive data it may be best to run it within a virtualmachine.
 
 Contributing
 Contributions are welcome! If you have ideas for improving Amoeba or would like to report issues, please open an issue or submit a pull request on the GitHub repository.
