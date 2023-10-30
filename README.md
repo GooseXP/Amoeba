@@ -39,7 +39,7 @@ Amoeba comes with a Makefile for easy installation. Here's how to install it:
 Usage
 Run Amoeba by simply entering its name in the terminal:
 amoeba
-The program will start and continuously learn and adapt its knowledge of Linux strings. It will execute commands, capture their output, and adjust its string length based on performance. To stop the program, use Ctrl+C.
+The program will start and continuously learn and adapt its knowledge of Linux strings. To stop the program, use Ctrl+C.
 
 Data Storage
 Amoeba stores learned data in two files:
