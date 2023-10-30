@@ -211,7 +211,7 @@ void normalize() {
             }
         }
     }
-    if (select_items > NORMTHLD) {
+    if (select_items >= NORMTHLD) {
         int select_average = select_scores / select_items; // Calculate the average of scores greater than the overall average
         for (int i = 0; i < dbloc; i++) {
             for (int j = 0; j < CMDMAX; j++) {
