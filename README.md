@@ -30,7 +30,7 @@ Sandboxing helps isolate the program from the host system and restricts its acce
 Installation
 Amoeba comes with a Makefile for easy installation. Here's how to install it:
 1. Clone the repository or download the source code.
-   git clone (https://github.com/Code-Cortex/Amoeba)
+   git clone "https://github.com/Code-Cortex/Amoeba"
    cd Amoeba
 2. Compile and install the program using make.
    make
