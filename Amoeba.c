@@ -256,7 +256,7 @@ int learn(int cmdlen) {
     for (int i = 0; cmdint[i] != -1; i++) {
         strcat(cmd, wordarray[cmdint[i]]);
     }
-
+	
     printf("\n$ %s\n", cmd);
 
     // Create a pipe to capture stdout
@@ -287,13 +287,10 @@ int learn(int cmdlen) {
     
     // Check child process status before reading data
     check_child_status();
-
-    // Read the contents of the pipe (stdout and stderr) directly into the output
-    int output_index = 0;
+    
     char current_char;
     while (read(pipefd[0], &current_char, 1) > 0) {
-        output[output_index] = current_char;
-        output_index++;
+    	printf("%c", current_char);
 
         // Check for word boundaries and increment lrnval when a new word is added
         if ((current_char == ' ' || current_char == '\n') && chridx > 0) {
@@ -327,9 +324,6 @@ int learn(int cmdlen) {
     }
     close(pipefd[0]);
 
-    output[output_index] = '\0'; // Null-terminate the output
-    printf("%s", output); // Print the captured output (stdout and stderr)
-
     // Update usage count for learned commands
     for (int i = 0; i <= cmdlen; i++) {
         wordinfo[cmdint[i]][i] += lrnval;
@@ -350,7 +344,6 @@ int main() {
 	signal(SIGALRM, timeout_handler);	
 	while (1) {
 		alarm(TIMEOUT);
-		
         // Learn and adapt command length based on performance
         score = learn(length);
         if (score >= prevscore) {
