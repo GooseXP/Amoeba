@@ -8,16 +8,16 @@
 #include <limits.h>
 
 // Define constants for database and buffer sizes
-#define DBBUFFER 1000000
-#define WRDBUFFER 100
+#define DBBUFFER 1000000 //set database buffer
+#define WRDBUFFER 100 //Set buffer for word length
 #define CMDMAX 10 //set the maximum number of commands to enter
 #define RUNTIME 3 // Set the process runtime in seconds
 #define TIMEOUT 10 //Timeout if child process locks waitpid
-#define NORMTHLD 5 //Set the threshold (in tenths of a percent) of items greater than the overall average before normalizing
+#define NORMTHLD 250 //Set the threshold for items with values greater than the average before normalizing.
 #define REWARD 10 //set reward for learning new data
 #define PENALTY 1 //Set penalty for recieving redundant data
 #define WRITEIVL 10 // Set the interval for writing the database to files
-
+#define SRCHPCT 10 //Set the maximum amount the database is searched each iteration, this is somewhat comperable to the epsilon value in other reinforcemnt learning algorithms
 
 // Define arrays for storing command strings and their usage info
 char wordarray[DBBUFFER][WRDBUFFER];
@@ -211,8 +211,7 @@ void normalize() {
             }
         }
     }
-	int selectpct = (select_items * 1000) / (dbloc * (CMDMAX - 1)); //tenth of a percent of items with above average scores
-    if (selectpct >= NORMTHLD) {
+    if (select_items >= NORMTHLD) {
         int select_average = select_scores / select_items; // Calculate the average of scores greater than the overall average
         for (int i = 0; i < dbloc; i++) {
             for (int j = 0; j < CMDMAX; j++) {
@@ -228,12 +227,12 @@ void normalize() {
 int learn(int cmdlen) {
     int chridx = 0;
     int lrnval = 0; // Initialize lrnval to 0
-    int srchitr = rand() % dbloc + 1;
+    int srchitr = rand() % ((dbloc * SRCHPCT) / 100);
     int select = 0;
     int cmdint[CMDMAX];
     char word[WRDBUFFER];
     char cmd[WRDBUFFER * CMDMAX];
-    char output_buffer[DBBUFFER]; // Character buffer to store the output
+    char output[DBBUFFER]; // Character buffer to store the output
     strcpy(cmd, "\0");
 
     // Randomly select commands for learning
@@ -276,9 +275,7 @@ int learn(int cmdlen) {
         close(pipefd[1]); // Close the duplicated file descriptors
 
         execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)0);
-        // Exec failed
-        perror("execl failue");
-        exit(1);
+        
     } else if (child_pid < 0) {
         // Handle fork failure
         perror("fork failure");
@@ -291,11 +288,11 @@ int learn(int cmdlen) {
     // Check child process status before reading data
     check_child_status();
 
-    // Read the contents of the pipe (stdout and stderr) directly into the output_buffer
+    // Read the contents of the pipe (stdout and stderr) directly into the output
     int output_index = 0;
     char current_char;
     while (read(pipefd[0], &current_char, 1) > 0) {
-        output_buffer[output_index] = current_char;
+        output[output_index] = current_char;
         output_index++;
 
         // Check for word boundaries and increment lrnval when a new word is added
@@ -330,8 +327,8 @@ int learn(int cmdlen) {
     }
     close(pipefd[0]);
 
-    output_buffer[output_index] = '\0'; // Null-terminate the output
-    printf("%s", output_buffer); // Print the captured output (stdout and stderr)
+    output[output_index] = '\0'; // Null-terminate the output
+    printf("%s", output); // Print the captured output (stdout and stderr)
 
     // Update usage count for learned commands
     for (int i = 0; i <= cmdlen; i++) {
@@ -353,9 +350,9 @@ int main() {
 	signal(SIGALRM, timeout_handler);	
 	while (1) {
 		alarm(TIMEOUT);
+		
         // Learn and adapt command length based on performance
         score = learn(length);
-
         if (score >= prevscore) {
             if (length < CMDMAX) {
                 length += rand() % 2;
