@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <limits.h>
+#include <ctype.h>
 
 // Define constants for database and buffer sizes
 #define DBBUFFER 1000000 //set database buffer
@@ -290,38 +291,39 @@ int learn(int cmdlen) {
     
     char current_char;
     while (read(pipefd[0], &current_char, 1) > 0) {
-    	printf("%c", current_char);
+    	if (isprint(current_char)) {
+			printf("%c", current_char);
+		    // Check for word boundaries and increment lrnval when a new word is added
+		    if ((current_char == ' ' || current_char == '\n') && chridx > 0) {
+		        word[chridx] = '\0';
 
-        // Check for word boundaries and increment lrnval when a new word is added
-        if ((current_char == ' ' || current_char == '\n') && chridx > 0) {
-            word[chridx] = '\0';
+		        int redundant = 0;
+		        for (int i = 0; i < dbloc; i++) {
+		            if (strcmp(wordarray[i], word) == 0) {
+		                redundant = 1;
+		                break; // Word already in the database
+		            }
+		        }
 
-            int redundant = 0;
-            for (int i = 0; i < dbloc; i++) {
-                if (strcmp(wordarray[i], word) == 0) {
-                    redundant = 1;
-                    break; // Word already in the database
-                }
-            }
+		        if (!redundant) {
+		            // Add the new word to the database
+		            strcpy(wordarray[dbloc], word);
+		            for (int i = 0; i < CMDMAX; i++) {
+		                wordinfo[dbloc][i] = 0;
+		            }
+		            dbloc++;
+		            lrnval += REWARD;
+		        } else{
+					lrnval -= PENALTY;			
+				}
 
-            if (!redundant) {
-                // Add the new word to the database
-                strcpy(wordarray[dbloc], word);
-                for (int i = 0; i < CMDMAX; i++) {
-                    wordinfo[dbloc][i] = 0;
-                }
-                dbloc++;
-                lrnval += REWARD;
-            } else{
-				lrnval -= PENALTY;			
-			}
-
-            chridx = 0;
-        } else {
-            word[chridx] = current_char;
-            chridx++;
-        }
-    }
+		        chridx = 0;
+		    } else {
+		        word[chridx] = current_char;
+		        chridx++;
+		    }
+		}
+}
     close(pipefd[0]);
 
     // Update usage count for learned commands
