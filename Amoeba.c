@@ -555,11 +555,28 @@ int updateDatabase(DatabaseStruct* database, char* output,int* cmdint){
 // Function to free the dynamically alocated arrays on program exit
 void cleanup(DatabaseStruct* database) {
 	char*** token = &(database->token);
+	int***** value = &(database->value);
+	int*** observation =&(database->observation);
+	size_t* numObservations = &(database->numObservations);
 	size_t* numWords = &(database->numWords);
 	for (size_t i = 0; i < *numWords; i++){
 		free((*token)[i]);
 	}
 	free(*token);
+		for (size_t i = 0; i < *numObservations; i++){
+		free((*observation)[i]);
+	}
+	free(*observation);
+	for (size_t i = 0; i < *numWords; i++) {
+    		for (int j = 0; j < CMDMAX; j++) {
+        		for (size_t k = 0; k < *numWords; k++) {
+        	  		  free(*value[i][j][k]);
+        		}
+        		free(*value[i][j]);
+    		}
+   		 free(*value[i]);
+	}
+	free(*value);
 }
 
 int main() {
