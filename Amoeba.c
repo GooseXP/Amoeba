@@ -563,7 +563,7 @@ void cleanup(DatabaseStruct* database) {
 		free((*token)[i]);
 	}
 	free(*token);
-		for (size_t i = 0; i < *numObservations; i++){
+	for (size_t i = 0; i < *numObservations; i++){
 		free((*observation)[i]);
 	}
 	free(*observation);
