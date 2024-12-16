@@ -24,7 +24,7 @@
 #define NORMTHLD 250       // Threshold for normalization (not currently used)
 #define REWARD 10          // Reward value when new data is learned
 #define PENALTY 1          // Penalty value when redundant data is observed
-#define INPUTBONUS 1       // Extra value added if input arguments appear together in observations
+#define INPUTBONUS 1       // Extra value added if input arguments appear together in observation_ptr
 #define WRITEIVL 10        // Interval (in iterations) for writing the database to files
 
 //////////////////////////////////////////////
@@ -38,7 +38,7 @@ volatile sig_atomic_t termination_requested = 0; // Flag to indicate if terminat
 //               STRUCTURES                 //
 //////////////////////////////////////////////
 
-// DatabaseStruct holds the learned words, their values, and observations
+// DatabaseStruct holds the learned words, their values, and observation_ptr
 typedef struct {
     // token: an array of strings representing all known words
     // Example: token[0] might be "ls", token[1] might be "cat", etc.
@@ -71,6 +71,7 @@ typedef struct {
 // Signal handler to set termination_requested flag if SIGINT or SIGTERM is received,
 void signal_handler(int signum) {
     if (signum == SIGINT || signum == SIGTERM) {
+    	printf("Termination requested please wait...");
         termination_requested = 1;
     }
 }
@@ -94,14 +95,14 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
         // Allocate token array with space for 1 word.
         *token = malloc(sizeof(char*));
         if (!*token) {
-            perror("Failed to allocate memory for tokens");
+            fprintf(stderr, "Failed to allocate memory for tokens");
             exit(EXIT_FAILURE);
         }
 
         // Allocate space for that 1 word
         (*token)[0] = malloc(wordLength + 1);
         if (!(*token)[0]) {
-            perror("Failed to allocate memory for first token");
+            fprintf(stderr, "Failed to allocate memory for first token");
             exit(EXIT_FAILURE);
         }
 
@@ -110,7 +111,7 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
         // (*value) is an array of size new_size of int*** pointers
         *value = calloc(new_size, sizeof(int***));
         if (!*value) {
-            perror("Failed to allocate memory for value array");
+            fprintf(stderr, "Failed to allocate memory for value array");
             exit(EXIT_FAILURE);
         }
 
@@ -141,7 +142,7 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
         // Increase token array size to hold one more word
         char** temp_token = realloc(*token, sizeof(char*) * new_size);
         if (!temp_token) {
-            perror("Failed to realloc memory for tokens");
+            fprintf(stderr, "Failed to realloc memory for tokens");
             exit(EXIT_FAILURE);
         }
         *token = temp_token;
@@ -149,14 +150,14 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
         // Place the new word at index new_size-1 (zero-based indexing)
         (*token)[new_size - 1] = malloc(wordLength + 1);
         if (!(*token)[new_size - 1]) {
-            perror("Failed to allocate memory for new token");
+            fprintf(stderr, "Failed to allocate memory for new token");
             exit(EXIT_FAILURE);
         }
 
         // Reallocate 'value' to hold one more word dimension:
         int**** temp_value = realloc(*value, new_size * sizeof(int***));
         if (!temp_value) {
-            perror("Failed to realloc memory for value array");
+            fprintf(stderr, "Failed to realloc memory for value array");
             exit(EXIT_FAILURE);
         }
         *value = temp_value;
@@ -207,36 +208,36 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
 }
 
 // Function: reallocateObservations
-// This function expands the observation array to accommodate one more line of observations
-// Each line of observations is an array of int indices into token.
+// This function expands the observation array to accommodate one more line of observation_ptr
+// Each line of observation_ptr is an array of int indices into token.
 void reallocateObservations(DatabaseStruct* database, int observationLength) {
     int*** observation_ptr = &(database->observation);
     size_t* old_size = &(database->numObservations);
     size_t new_size = *old_size + 1; 
 
     if (*old_size == 0) {
-        // No observations before, allocate the first line
+        // No observation_ptr before, allocate the first line
         *observation_ptr = malloc(sizeof(int*) * new_size);
         if (!*observation_ptr) {
-            perror("Failed to allocate memory for observations");
+            fprintf(stderr, "Failed to allocate memory for observation_ptr");
             exit(EXIT_FAILURE);
         }
         (*observation_ptr)[0] = malloc(sizeof(int)*(observationLength + 2));
         if (!(*observation_ptr)[0]) {
-            perror("Failed to allocate memory for first observation");
+            fprintf(stderr, "Failed to allocate memory for first observation");
             exit(EXIT_FAILURE);
         }
     } else {
-        // Already have observations, so reallocate for one more line
+        // Already have observation_ptr, so reallocate for one more line
         int** temp_observation = realloc(*observation_ptr, sizeof(int*) * new_size);
         if (!temp_observation) {
-            perror("Failed to realloc memory for observations");
+            fprintf(stderr, "Failed to realloc memory for observation_ptr");
             exit(EXIT_FAILURE);
         }
         *observation_ptr = temp_observation;
         (*observation_ptr)[new_size - 1] = malloc(sizeof(int)*(observationLength + 2));
         if (!(*observation_ptr)[new_size - 1]) {
-            perror("Failed to allocate memory for new observation");
+            fprintf(stderr, "Failed to allocate memory for new observation");
             exit(EXIT_FAILURE);
         }
     }
@@ -265,7 +266,7 @@ void init(DatabaseStruct* database) {
     // Get a list of commands by running "ls /bin && ls /sbin"
     FILE* cmdfile = popen("ls /bin && ls /sbin", "r");
     if(!cmdfile) {
-        perror("popen");
+        fprintf(stderr, "popen");
         exit(EXIT_FAILURE);
     }
 
@@ -326,14 +327,14 @@ void init(DatabaseStruct* database) {
 //////////////////////////////////////////////
 
 // Function: writeDB
-// Writes the current tokens, values, and observations to disk.
+// Writes the current tokens, values, and observation_ptr to disk.
 // tokens.txt for words
 // values.csv for the 4D values
-// observations.csv for the observation lines
+// observation_ptr.csv for the observation lines
 void writeDB(DatabaseStruct* database) {
     FILE* tokenFile = fopen("tokens.txt", "w");
     FILE* valueFile = fopen("values.csv", "w");
-    FILE* observationFile = fopen("observations.csv", "w");
+    FILE* observationFile = fopen("observation_ptr.csv", "w");
     if (!tokenFile || !valueFile || !observationFile) {
         fprintf(stderr,"Failed to open files for writing.\n");
         if(tokenFile) fclose(tokenFile);
@@ -371,7 +372,7 @@ void writeDB(DatabaseStruct* database) {
         fprintf(valueFile, "\n");
     }
 
-    // Write observations to observations.csv
+    // Write observation_ptr to observation_ptr.csv
     // Each observation line ends with -1
     for (size_t i = 0; i < numObservations; i++) {
         int idx = 0;
@@ -388,13 +389,13 @@ void writeDB(DatabaseStruct* database) {
 }
 
 // Function: loadDB
-// Attempts to load tokens, values, and observations from disk.
+// Attempts to load tokens, values, and observation_ptr from disk.
 // If not found, returns 1 to indicate we need to init from scratch.
 // Otherwise, loads everything into memory.
 int loadDB(DatabaseStruct* database) {
     FILE* tokenFile = fopen("tokens.txt", "r");
     FILE* valueFile = fopen("values.csv", "r");
-    FILE* observationFile = fopen("observations.csv", "r");
+    FILE* observationFile = fopen("observation_ptr.csv", "r");
 
     char*** token = &(database->token);
     int***** value = &(database->value); // Corrected pointer type
@@ -489,7 +490,7 @@ int loadDB(DatabaseStruct* database) {
     fclose(tokenFile);
     fclose(valueFile);
 
-    // Load observations if any
+    // Load observation_ptr if any
     if (observationFile) {
         char line[LINEBUFFER*4];
         while (fgets(line, sizeof(line), observationFile)) {
@@ -535,11 +536,11 @@ int check_child_status() {
             // Child ran too long, try to kill it
             if (kill_attempts == 0) {
                 if (kill(child_pid, SIGTERM) != 0) {
-                    perror("kill SIGTERM");
+                    fprintf(stderr, "kill SIGTERM");
                 }
             } else if (kill_attempts == 1) {
                 if (kill(child_pid, SIGKILL) != 0) {
-                    perror("kill SIGKILL");
+                    fprintf(stderr, "kill SIGKILL");
                 }
             } else if (kill_attempts == 2) {
                 fprintf(stderr, "Failed to terminate the child process %d.\n", child_pid);
@@ -559,7 +560,7 @@ int check_child_status() {
                 return 0;
             }
         } else if (wpid < 0) {
-            perror("waitpid");
+            fprintf(stderr, "waitpid");
             child_pid = 0;
             return 1;
         }
@@ -581,7 +582,7 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
     size_t numWords = database->numWords;
     size_t numObservations = database->numObservations;
     int**** value = database->value;
-    int** obs = database->observation;
+    int** observation = database->observation;
 
     // Limit cmdlen to CMDMAX - 1
     if (cmdlen >= CMDMAX) cmdlen = CMDMAX -1;
@@ -625,14 +626,14 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
                                 continue;
                             }
                             prevcmdval += value[cmdint[k]][k][cmdint[l]][l];
-                            // Also check observations to add INPUTBONUS if args appear together
+                            // Also check observation_ptr to add INPUTBONUS if args appear together
                             for (size_t m = 0; m < numObservations; m++){
                                 arg1found = 0; arg2found = 0;
-                                for (int n = 0; obs[m][n] != -1; n++) {
-                                    if (obs[m][n] == select) {
+                                for (int n = 0; observation[m][n] != -1; n++) {
+                                    if (observation[m][n] == select) {
                                         arg1found = 1;
                                     }
-                                    if (obs[m][n] == cmdint[k]) {
+                                    if (observation[m][n] == cmdint[k]) {
                                         arg2found = 1;
                                     }
                                 }
@@ -651,14 +652,14 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
                         continue;
                     }
                     cmdval += value[select][j][cmdint[k]][k];
-                    // Check observations again
+                    // Check observation_ptr again
                     for (size_t l = 0; l < numObservations; l++){
                         arg1found = 0; arg2found = 0;
-                        for (int m = 0; obs[l][m] != -1; m++) {
-                            if (obs[l][m] == select) {
+                        for (int m = 0; observation[l][m] != -1; m++) {
+                            if (observation[l][m] == select) {
                                 arg1found = 1;
                             }
-                            if (obs[l][m] == cmdint[k]) {
+                            if (observation[l][m] == cmdint[k]) {
                                 arg2found = 1;
                             }
                         }
@@ -691,7 +692,7 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
 char* executeCommand(char cmd[]) {
     int pipefd[2];
     if (pipe(pipefd) == -1) {
-        perror("pipe");
+        fprintf(stderr, "pipe");
         return NULL;
     }
 
@@ -703,11 +704,11 @@ char* executeCommand(char cmd[]) {
         dup2(pipefd[1], 2);
         close(pipefd[1]);
         execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)0);
-        perror("execl");
+        fprintf(stderr, "execl");
         exit(1);
     } else if (child_pid < 0) {
         // fork failed
-        perror("fork");
+        fprintf(stderr, "fork");
         return NULL;
     }
 
@@ -715,7 +716,7 @@ char* executeCommand(char cmd[]) {
     close(pipefd[1]);
     char* output = malloc(1);
     if (!output) {
-        perror("Failed to allocate memory for command output");
+        fprintf(stderr, "Failed to allocate memory for command output");
         close(pipefd[0]);
         return NULL;
     }
@@ -725,7 +726,7 @@ char* executeCommand(char cmd[]) {
         if (current_char == '\n' || isprint((unsigned char)current_char)) {
             char* temp = realloc(output, sizeof(char) * (output_index + 2));
             if (!temp) {
-                perror("Failed to realloc memory for command output");
+                fprintf(stderr, "Failed to realloc memory for command output");
                 free(output);
                 close(pipefd[0]);
                 return NULL;
@@ -737,7 +738,7 @@ char* executeCommand(char cmd[]) {
     close(pipefd[0]);
     output = realloc(output, sizeof(char) * (output_index + 1));
     if (!output) {
-        perror("Failed to realloc memory for final command output");
+        fprintf(stderr, "Failed to realloc memory for final command output");
         return NULL;
     }
     output[output_index] = '\0';
@@ -756,7 +757,7 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
     int***** value = &(database->value); // Pointer to int**** (i.e., int*****)
 
     char*** token = &(database->token);
-    int*** observations = &(database->observation);
+    int*** observation_ptr = &(database->observation);
     size_t* numObservations = &database->numObservations;
     size_t* numWords = &database->numWords;
 
@@ -865,13 +866,13 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                     for (size_t line = 0; line < *numObservations; line++) {
                         int match = 1;
                         for (int idx = 0; idx < observationLength; idx++) {
-                            if ((*observations)[line][idx] != tokenized_line[idx]) {
+                            if ((*observation_ptr)[line][idx] != tokenized_line[idx]) {
                                 match = 0;
                                 break;
                             }
                         }
                         // Check if ended exactly with -1
-                        if (match && ((*observations)[line][observationLength] == -1)) {
+                        if (match && ((*observation_ptr)[line][observationLength] == -1)) {
                             redobs = 1;
                             break;
                         }
@@ -884,14 +885,14 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                         reallocateObservations(database, observationLength);
                         // reallocateObservations increments *numObservations internally
 
-                        // Now write the tokenized_line into observations
+                        // Now write the tokenized_line into observation_ptr
                         // *numObservations is now incremented, so we use (*numObservations - 1)
                         size_t obsIndex = *numObservations - 1;
                         for (int i = 0; i < observationLength; i++) {
-                            (*observations)[obsIndex][i] = tokenized_line[i];
+                            (*observation_ptr)[obsIndex][i] = tokenized_line[i];
                         }
                         // Add the terminator
-                        (*observations)[obsIndex][observationLength] = -1;
+                        (*observation_ptr)[obsIndex][observationLength] = -1;
                     } else {
                         // Redundant observation line
                         lrnval -= PENALTY;
@@ -917,7 +918,7 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
 
     // After processing all output
     // If any observation line is incomplete (no newline), we ignore it or handle accordingly:
-    // If we consider incomplete lines as not valid observations, do nothing.
+    // If we consider incomplete lines as not valid observation_ptr, do nothing.
 
     // Update values for the command arguments (if necessary)
     for (int i = 0; cmdint[i] != -1; i++) {
