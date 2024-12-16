@@ -21,7 +21,6 @@
 #define SRCHMAX 100        // Maximum percentage to search database
 #define CMDMAX 10          // Maximum number of arguments (words) in a generated command
 #define RUNTIME 3          // Child process allowed runtime in seconds
-#define TIMEOUT 10         // Timeout for waiting on child process termination
 #define NORMTHLD 250       // Threshold for normalization (not currently used)
 #define REWARD 10          // Reward value when new data is learned
 #define PENALTY 1          // Penalty value when redundant data is observed
@@ -70,15 +69,9 @@ typedef struct {
 //////////////////////////////////////////////
 
 // Signal handler to set termination_requested flag if SIGINT or SIGTERM is received,
-// or handle timeout (SIGALRM)
 void signal_handler(int signum) {
     if (signum == SIGINT || signum == SIGTERM) {
         termination_requested = 1;
-        fprintf(stderr, "Termination signal received.\n");
-    } else if (signum == SIGALRM){
-        // In case we use alarms, this would reset child_pid
-        child_pid = 0;
-        fprintf(stderr, "Alarm signal received. Resetting child_pid.\n");
     }
 }
 
@@ -96,21 +89,19 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
     size_t* old_size  = &(database->numWords); 
     size_t new_size = *old_size + 1;
 
-    fprintf(stderr, "Reallocating words. Old size: %zu, New size: %zu\n", *old_size, new_size);
-
     if (*old_size == 0) {
         // If this is the first word:
         // Allocate token array with space for 1 word.
         *token = malloc(sizeof(char*));
         if (!*token) {
-            fprintf(stderr, "Failed to allocate memory for tokens.\n");
+            perror("Failed to allocate memory for tokens");
             exit(EXIT_FAILURE);
         }
 
         // Allocate space for that 1 word
         (*token)[0] = malloc(wordLength + 1);
         if (!(*token)[0]) {
-            fprintf(stderr, "Failed to allocate memory for first token.\n");
+            perror("Failed to allocate memory for first token");
             exit(EXIT_FAILURE);
         }
 
@@ -119,7 +110,7 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
         // (*value) is an array of size new_size of int*** pointers
         *value = calloc(new_size, sizeof(int***));
         if (!*value) {
-            fprintf(stderr, "Failed to allocate memory for value array.\n");
+            perror("Failed to allocate memory for value array");
             exit(EXIT_FAILURE);
         }
 
@@ -150,7 +141,7 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
         // Increase token array size to hold one more word
         char** temp_token = realloc(*token, sizeof(char*) * new_size);
         if (!temp_token) {
-            fprintf(stderr, "Failed to realloc memory for tokens.\n");
+            perror("Failed to realloc memory for tokens");
             exit(EXIT_FAILURE);
         }
         *token = temp_token;
@@ -158,14 +149,14 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
         // Place the new word at index new_size-1 (zero-based indexing)
         (*token)[new_size - 1] = malloc(wordLength + 1);
         if (!(*token)[new_size - 1]) {
-            fprintf(stderr, "Failed to allocate memory for new token.\n");
+            perror("Failed to allocate memory for new token");
             exit(EXIT_FAILURE);
         }
 
         // Reallocate 'value' to hold one more word dimension:
         int**** temp_value = realloc(*value, new_size * sizeof(int***));
         if (!temp_value) {
-            fprintf(stderr, "Failed to realloc memory for value array.\n");
+            perror("Failed to realloc memory for value array");
             exit(EXIT_FAILURE);
         }
         *value = temp_value;
@@ -213,7 +204,6 @@ void reallocateWords(DatabaseStruct* database, int wordLength) {
 
     // Update the word count to reflect the new word
     *old_size = new_size;
-    fprintf(stderr, "Reallocation complete. Current numWords: %zu\n", *old_size);
 }
 
 // Function: reallocateObservations
@@ -223,37 +213,35 @@ void reallocateObservations(DatabaseStruct* database, int observationLength) {
     int*** observation_ptr = &(database->observation);
     size_t* old_size = &(database->numObservations);
     size_t new_size = *old_size + 1; 
-    fprintf(stderr, "Reallocating observations. Old size: %zu, New size: %zu\n", *old_size, new_size);
 
     if (*old_size == 0) {
         // No observations before, allocate the first line
         *observation_ptr = malloc(sizeof(int*) * new_size);
         if (!*observation_ptr) {
-            fprintf(stderr, "Failed to allocate memory for observations.\n");
+            perror("Failed to allocate memory for observations");
             exit(EXIT_FAILURE);
         }
         (*observation_ptr)[0] = malloc(sizeof(int)*(observationLength + 2));
         if (!(*observation_ptr)[0]) {
-            fprintf(stderr, "Failed to allocate memory for first observation.\n");
+            perror("Failed to allocate memory for first observation");
             exit(EXIT_FAILURE);
         }
     } else {
         // Already have observations, so reallocate for one more line
         int** temp_observation = realloc(*observation_ptr, sizeof(int*) * new_size);
         if (!temp_observation) {
-            fprintf(stderr, "Failed to realloc memory for observations.\n");
+            perror("Failed to realloc memory for observations");
             exit(EXIT_FAILURE);
         }
         *observation_ptr = temp_observation;
         (*observation_ptr)[new_size - 1] = malloc(sizeof(int)*(observationLength + 2));
         if (!(*observation_ptr)[new_size - 1]) {
-            fprintf(stderr, "Failed to allocate memory for new observation.\n");
+            perror("Failed to allocate memory for new observation");
             exit(EXIT_FAILURE);
         }
     }
     // Increment observation count
     *old_size = new_size;
-    fprintf(stderr, "Reallocation complete. Current numObservations: %zu\n", *old_size);
 }
 
 //////////////////////////////////////////////
@@ -291,20 +279,18 @@ void init(DatabaseStruct* database) {
             } else {
                 // Word too long, truncate safely
                 word[chridx] = '\0';
-                fprintf(stderr, "Warning: word too long '%s', truncating.\n", word);
+                // We'll still treat this truncated word as valid
                 chridx = 0;
             }
         } else {
             // We hit a space or newline, which means we have a complete word
             if (chridx > 0) {
                 word[chridx] = '\0'; // Null-terminate
-                fprintf(stderr, "Attempting to add word: '%s'\n", word);
                 // Check if word is already known
                 int redundantWord = 0;
                 for (size_t i = 0; i < *numWords; i++) {
                     if ((*token)[i] && strcmp((*token)[i], word) == 0) {
                         redundantWord = 1;
-                        fprintf(stderr, "Redundant word found: '%s'\n", word);
                         break;
                     }
                 }
@@ -313,7 +299,6 @@ void init(DatabaseStruct* database) {
                     reallocateWords(database, (int)strlen(word));
                     // Copy the new word into token array at index numWords-1
                     strcpy((*token)[*numWords - 1], word);
-                    fprintf(stderr, "Added new word: '%s' at index %zu\n", word, *numWords - 1);
 
                     // Initialize values for this new word
                     for (int i = 0; i < CMDMAX; i++) {
@@ -334,7 +319,6 @@ void init(DatabaseStruct* database) {
         }
     }
     pclose(cmdfile);
-    fprintf(stderr, "Initialization complete. Total words: %zu\n", database->numWords);
 }
 
 //////////////////////////////////////////////
@@ -401,7 +385,6 @@ void writeDB(DatabaseStruct* database) {
     fclose(tokenFile);
     fclose(valueFile);
     fclose(observationFile);
-    fprintf(stderr, "Database written to disk. Words: %zu, Observations: %zu\n", numWords, numObservations);
 }
 
 // Function: loadDB
@@ -430,16 +413,39 @@ int loadDB(DatabaseStruct* database) {
         if(observationFile) fclose(observationFile);
         return 1;
     }
-
-    fprintf(stderr, "Loading database from disk...\n");
+    printf("Loading Database please wait...\n");
 
     // First load all tokens to count them
     char word[WRDBUFFER];
     while (fgets(word, sizeof(word), tokenFile)) {
         word[strcspn(word, "\n")] = '\0';
-        fprintf(stderr, "Loading token: '%s'\n", word);
-        reallocateWords(database, (int)strlen(word));
-        strcpy((*token)[*numWords - 1], word);
+        // Check if word is already known
+        int redundantWord = 0;
+        for (size_t i = 0; i < *numWords; i++) {
+            if ((*token)[i] && strcmp((*token)[i], word) == 0) {
+                redundantWord = 1;
+                break;
+            }
+        }
+        if (!redundantWord) {
+            // If new word, reallocate arrays to add this word
+            reallocateWords(database, (int)strlen(word));
+            // Copy the new word into token array at index numWords-1
+            strcpy((*token)[*numWords - 1], word);
+
+            // Initialize values for this new word
+            for (int i = 0; i < CMDMAX; i++) {
+                for (size_t j = 0; j < *numWords; j++) {
+                    for (int k =0; k < CMDMAX; k++) {
+                        if ((*numWords - 1) >= database->numWords || i >= CMDMAX || j >= database->numWords || k >= CMDMAX) {
+                            fprintf(stderr, "Index out of bounds while initializing value for new word.\n");
+                            continue;
+                        }
+                        (*value)[*numWords - 1][i][j][k] = 0;
+                    }
+                }
+            }
+        }
     }
 
     // Now, we have loaded all words (numWords known)
@@ -457,7 +463,6 @@ int loadDB(DatabaseStruct* database) {
     *numWords = 0; // reset and reload to align with reading values
     while (fgets(word, sizeof(word), tokenFile)) {
         word[strcspn(word, "\n")] = '\0';
-        fprintf(stderr, "Re-loading token: '%s'\n", word);
         reallocateWords(database, (int) strlen(word));
         strcpy((*token)[*numWords - 1], word);
 
@@ -483,7 +488,6 @@ int loadDB(DatabaseStruct* database) {
 
     fclose(tokenFile);
     fclose(valueFile);
-    fprintf(stderr, "Tokens and values loaded successfully. Total words: %zu\n", *numWords);
 
     // Load observations if any
     if (observationFile) {
@@ -497,7 +501,6 @@ int loadDB(DatabaseStruct* database) {
                 ptr = strtok(NULL, ",");
             }
             observation_line[index] = -1;
-            fprintf(stderr, "Loading observation line with %d tokens.\n", index);
             reallocateObservations(database, index);
             size_t obsIndex = *numObservations - 1;
             for(int i = 0; i <= index; i++){
@@ -505,14 +508,13 @@ int loadDB(DatabaseStruct* database) {
             }
         }
         fclose(observationFile);
-        fprintf(stderr, "Observations loaded successfully. Total observations: %zu\n", *numObservations);
     }
 
     return 0;
 }
 
 //////////////////////////////////////////////
-//         CHILD PROCESS MANAGEMENT         //
+//        CHILD PROCESS MANAGEMENT         //
 //////////////////////////////////////////////
 
 // Function: check_child_status
@@ -523,7 +525,7 @@ int check_child_status() {
     time_t start_time, current_time;
     time(&start_time);
     int kill_attempts = 0;
-    fprintf(stderr, "Checking child process status...\n");
+
     while (1) {
         pid_t wpid = waitpid(child_pid, &status, WNOHANG);
         time(&current_time);
@@ -532,12 +534,10 @@ int check_child_status() {
         if (proc_time >= RUNTIME) {
             // Child ran too long, try to kill it
             if (kill_attempts == 0) {
-                fprintf(stderr, "Runtime exceeded. Sending SIGTERM to child %d.\n", child_pid);
                 if (kill(child_pid, SIGTERM) != 0) {
                     perror("kill SIGTERM");
                 }
             } else if (kill_attempts == 1) {
-                fprintf(stderr, "SIGTERM failed. Sending SIGKILL to child %d.\n", child_pid);
                 if (kill(child_pid, SIGKILL) != 0) {
                     perror("kill SIGKILL");
                 }
@@ -551,12 +551,10 @@ int check_child_status() {
         } else if (wpid == child_pid) {
             // wpid matches child_pid, so child changed state
             if (WIFEXITED(status)) {
-                fprintf(stderr, "Child %d exited with status %d.\n", child_pid, WEXITSTATUS(status));
                 child_pid = 0;
                 return 0;
             }
             if (WIFSIGNALED(status)) {
-                fprintf(stderr, "Child %d was killed by signal %d.\n", child_pid, WTERMSIG(status));
                 child_pid = 0;
                 return 0;
             }
@@ -592,8 +590,6 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
     int srchitr = (int)((numWords * srchpct) / 100);
     if (srchitr < 1) srchitr = 1; // Ensure at least one iteration
 
-    fprintf(stderr, "Constructing command: cmdlen=%d, srchpct=%d%%, srchitr=%d\n", cmdlen, srchpct, srchitr);
-
     // Local variables for searching best command combination
     int select = 0;
     int cmdval = 0;
@@ -614,21 +610,18 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
         for (int j = 0; j < cmdlen; j++) {
             // Randomly select a word
             if (numWords == 0) {
-                fprintf(stderr, "No words available to construct command.\n");
+                // No words available to construct command
                 return cmdint;
             }
             select = (int)(rand() % numWords);
-            fprintf(stderr, "Iteration %d: Selecting word index %d ('%s') for position %d\n", i, select, database->token[select], j);
             if (i == 0) {
                 // First iteration builds a baseline command
                 cmdint[j] = select;
-                fprintf(stderr, "Set cmdint[%d] to %d ('%s')\n", j, select, database->token[select]);
                 if (j == cmdlen-1) {
                     // Once the command is fully chosen, calculate its initial score
                     for (int k = 0; k < cmdlen; k++) {
                         for (int l = 0; l < cmdlen; l++) {
                             if (cmdint[k] < 0 || cmdint[l] < 0 || (size_t)cmdint[k] >= numWords || (size_t)cmdint[l] >= numWords) {
-                                fprintf(stderr, "Invalid indices in cmdint: k=%d, l=%d\n", k, l);
                                 continue;
                             }
                             prevcmdval += value[cmdint[k]][k][cmdint[l]][l];
@@ -649,14 +642,12 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
                             }
                         }
                     }
-                    fprintf(stderr, "Initial command value: %d\n", prevcmdval);
                 }
             } else {
                 // Subsequent iterations: try changing one argument and see if it improves
                 cmdval = 0;
                 for (int k = 0; k < cmdlen; k++) {
                     if (select < 0 || cmdint[k] < 0 || (size_t)select >= numWords || (size_t)cmdint[k] >= numWords) {
-                        fprintf(stderr, "Invalid indices when calculating cmdval: select=%d, k=%d\n", select, k);
                         continue;
                     }
                     cmdval += value[select][j][cmdint[k]][k];
@@ -676,12 +667,8 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
                         }
                     }
                 }
-                fprintf(stderr, "Iteration %d: Calculated cmdval=%d for position %d\n", i, cmdval, j);
                 // If the new cmdval is better than prevcmdval, update the command
                 if (cmdval > prevcmdval) {
-                    fprintf(stderr, "Improving command: updating cmdint[%d] from %d ('%s') to %d ('%s')\n", 
-                            j, cmdint[j], (cmdint[j] >=0 && (size_t)cmdint[j] < numWords) ? database->token[cmdint[j]] : "N/A", 
-                            select, database->token[select]);
                     cmdint[j] = select;
                     prevcmdval = cmdval;
                     cmdval = 0;
@@ -691,15 +678,6 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
     }
 
     cmdint[cmdlen] = -1; // Terminate command list
-    fprintf(stderr, "Constructed command with cmdlen=%d: ", cmdlen);
-    for(int i = 0; i < cmdlen; i++) {
-        if (cmdint[i] != -1 && (size_t)cmdint[i] < numWords) {
-            fprintf(stderr, "%s ", database->token[cmdint[i]]);
-        } else {
-            fprintf(stderr, "N/A ");
-        }
-    }
-    fprintf(stderr, "\n");
     return cmdint;
 }
 
@@ -713,7 +691,7 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
 char* executeCommand(char cmd[]) {
     int pipefd[2];
     if (pipe(pipefd) == -1) {
-        fprintf(stderr,"pipe error\n");
+        perror("pipe");
         return NULL;
     }
 
@@ -725,56 +703,45 @@ char* executeCommand(char cmd[]) {
         dup2(pipefd[1], 2);
         close(pipefd[1]);
         execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)0);
-        fprintf(stderr,"execl failure\n");
+        perror("execl");
         exit(1);
     } else if (child_pid < 0) {
         // fork failed
-        fprintf(stderr,"fork failure\n");
+        perror("fork");
         return NULL;
     }
 
     // Parent: close write end, read from pipe
     close(pipefd[1]);
-    fprintf(stderr, "Executing command: '%s'\n", cmd);
-    int exit_failure = check_child_status();
-    if (!exit_failure) {
-        // Child finished normally, read its output
-        char* output = malloc(1);
-        if (!output) {
-            fprintf(stderr, "Failed to allocate memory for command output.\n");
-            close(pipefd[0]);
-            return NULL;
-        }
-        int output_index = 0;
-        char current_char;
-        while (read(pipefd[0], &current_char, 1) > 0) {
-            if (current_char == '\n' || isprint((unsigned char)current_char)) {
-                char* temp = realloc(output, sizeof(char) * (output_index + 2));
-                if (!temp) {
-                    fprintf(stderr, "Failed to realloc memory for command output.\n");
-                    free(output);
-                    close(pipefd[0]);
-                    return NULL;
-                }
-                output = temp;
-                output[output_index++] = current_char;
-            }
-        }
-        close(pipefd[0]);
-        output = realloc(output, sizeof(char) * (output_index + 1));
-        if (!output) {
-            fprintf(stderr, "Failed to realloc memory for final command output.\n");
-            return NULL;
-        }
-        output[output_index] = '\0';
-        fprintf(stderr, "Command executed successfully. Output length: %d\n", output_index);
-        return output;
-    } else {
-        // Child did not finish properly or was killed
-        fprintf(stderr, "Child process did not finish properly.\n");
+    char* output = malloc(1);
+    if (!output) {
+        perror("Failed to allocate memory for command output");
         close(pipefd[0]);
         return NULL;
     }
+    int output_index = 0;
+    char current_char;
+    while (read(pipefd[0], &current_char, 1) > 0) {
+        if (current_char == '\n' || isprint((unsigned char)current_char)) {
+            char* temp = realloc(output, sizeof(char) * (output_index + 2));
+            if (!temp) {
+                perror("Failed to realloc memory for command output");
+                free(output);
+                close(pipefd[0]);
+                return NULL;
+            }
+            output = temp;
+            output[output_index++] = current_char;
+        }
+    }
+    close(pipefd[0]);
+    output = realloc(output, sizeof(char) * (output_index + 1));
+    if (!output) {
+        perror("Failed to realloc memory for final command output");
+        return NULL;
+    }
+    output[output_index] = '\0';
+    return output;
 }
 
 //////////////////////////////////////////////
@@ -787,9 +754,9 @@ char* executeCommand(char cmd[]) {
 int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
     // Correctly declare value as a pointer to the value field
     int***** value = &(database->value); // Pointer to int**** (i.e., int*****)
-    
+
     char*** token = &(database->token);
-       int*** observations = &(database->observation);
+    int*** observations = &(database->observation);
     size_t* numObservations = &database->numObservations;
     size_t* numWords = &database->numWords;
 
@@ -801,8 +768,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
     char word[WRDBUFFER];
     memset(word, 0, sizeof(word));
 
-    fprintf(stderr, "Updating database with command output.\n");
-
     // Parse the output into words
     while (1) {
         char c = output[output_index];
@@ -810,7 +775,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
             // End of output, handle any last word
             if (chridx > 0) {
                 word[chridx] = '\0';
-                fprintf(stderr, "Processing last word: '%s'\n", word);
                 chridx = 0;
 
                 // Check if the word is already known
@@ -825,11 +789,9 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
 
                 // If new word
                 if (!redundantWord && strlen(word) != 0) {
-                    fprintf(stderr, "Adding new word from output: '%s'\n", word);
                     reallocateWords(database, (int)strlen(word));
                     // Now *numWords has been incremented inside reallocateWords
                     strcpy((*token)[*numWords - 1], word);
-                    fprintf(stderr, "Added new word: '%s' at index %zu\n", word, *numWords - 1);
 
                     // Initialize value for new word
                     for (int ii = 0; ii < CMDMAX; ii++) {
@@ -839,9 +801,7 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                                     fprintf(stderr, "Index out of bounds while initializing value for new word.\n");
                                     continue;
                                 }
-                                // Use value to access the 4D array correctly
                                 (*value)[*numWords - 1][ii][jj][kk] = 0;
-                                fprintf(stderr, "Initialized value[%zu][%d][%zu][%d] to 0.\n", *numWords -1, ii, jj, kk);
                             }
                         }
                     }
@@ -861,7 +821,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
             // End of a word
             if (chridx > 0) {
                 word[chridx] = '\0';
-                fprintf(stderr, "Processing word: '%s'\n", word);
                 chridx = 0;
 
                 // Check if this word is new
@@ -874,10 +833,8 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                     }
                 }
                 if (!redundantWord && strlen(word) != 0) {
-                    fprintf(stderr, "Adding new word from output: '%s'\n", word);
                     reallocateWords(database, (int)strlen(word));
                     strcpy((*token)[*numWords - 1], word);
-                    fprintf(stderr, "Added new word: '%s' at index %zu\n", word, *numWords - 1);
 
                     for (int ii = 0; ii < CMDMAX; ii++) {
                         for (size_t jj = 0; jj < *numWords; jj++) {
@@ -886,7 +843,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                                     fprintf(stderr, "Index out of bounds while initializing value for new word.\n");
                                     continue;
                                 }
-                                fprintf(stderr, "Initializing value[%zu][%d][%zu][%d] to 0\n", *numWords - 1, ii, jj, kk);
                                 (*value)[*numWords - 1][ii][jj][kk] = 0;
                             }
                         }
@@ -904,7 +860,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
 
                 // If we hit a newline, that means we completed one observation line
                 if (c == '\n') {
-                    fprintf(stderr, "Processing completed observation line with %d tokens.\n", observationLength);
                     // Check if this observation line is new
                     int redobs = 0;
                     for (size_t line = 0; line < *numObservations; line++) {
@@ -918,7 +873,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                         // Check if ended exactly with -1
                         if (match && ((*observations)[line][observationLength] == -1)) {
                             redobs = 1;
-                            fprintf(stderr, "Redundant observation line found.\n");
                             break;
                         }
                     }
@@ -926,7 +880,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                     if (!redobs) {
                         // New observation line
                         lrnval += REWARD;
-                        fprintf(stderr, "Adding new observation line.\n");
                         // Allocate space for a new observation line
                         reallocateObservations(database, observationLength);
                         // reallocateObservations increments *numObservations internally
@@ -939,11 +892,9 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
                         }
                         // Add the terminator
                         (*observations)[obsIndex][observationLength] = -1;
-                        fprintf(stderr, "New observation line added at index %zu.\n", obsIndex);
                     } else {
                         // Redundant observation line
                         lrnval -= PENALTY;
-                        fprintf(stderr, "Redundant observation line. Applying penalty.\n");
                     }
 
                     // Reset for the next line
@@ -957,7 +908,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
             } else {
                 // Word too long, truncate safely
                 word[chridx] = '\0';
-                fprintf(stderr, "Warning: word too long '%s', truncating.\n", word);
                 // We'll still treat this truncated word as valid
                 chridx = 0;
             }
@@ -970,15 +920,11 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
     // If we consider incomplete lines as not valid observations, do nothing.
 
     // Update values for the command arguments (if necessary)
-    // In your original code you adjusted val based on cmdint. Make sure indices are valid:
-    fprintf(stderr, "Updating value associations based on command.\n");
     for (int i = 0; cmdint[i] != -1; i++) {
         for (int j = 0; cmdint[j] != -1; j++) {
             // Ensure cmdint[i], cmdint[j] are within range [0, *numWords-1]
             if (cmdint[i] >= 0 && (size_t)cmdint[i] < *numWords && 
                 cmdint[j] >= 0 && (size_t)cmdint[j] < *numWords) {
-                fprintf(stderr, "Updating val[%d][%d][%d][%d] += %d\n", 
-                        cmdint[i], i, cmdint[j], j, lrnval);
                 (*value)[cmdint[i]][i][cmdint[j]][j] += lrnval;
             } else {
                 fprintf(stderr, "Invalid cmdint indices: cmdint[%d]=%d, cmdint[%d]=%d\n", 
@@ -986,8 +932,6 @@ int updateDatabase(DatabaseStruct* database, char* output, int* cmdint) {
             }
         }
     }
-
-    fprintf(stderr, "Database update complete. Learning value: %d\n", lrnval);
     return lrnval;
 }
 
@@ -1002,20 +946,16 @@ void cleanup(DatabaseStruct* database) {
     if (database->token) {
         for (size_t i = 0; i < database->numWords; i++){
             free(database->token[i]);
-            fprintf(stderr, "Freed token[%zu].\n", i);
         }
         free(database->token);
-        fprintf(stderr, "Freed token array.\n");
     }
 
     // Free observation arrays
     if (database->observation) {
         for (size_t i = 0; i < database->numObservations; i++){
             free(database->observation[i]);
-            fprintf(stderr, "Freed observation[%zu].\n", i);
         }
         free(database->observation);
-        fprintf(stderr, "Freed observation array.\n");
     }
 
     // Free value arrays (4D structure)
@@ -1024,16 +964,12 @@ void cleanup(DatabaseStruct* database) {
             for (int j = 0; j < CMDMAX; j++) {
                 for (size_t k = 0; k < database->numWords; k++) {
                     free(database->value[i][j][k]);
-                    fprintf(stderr, "Freed value[%zu][%d][%zu].\n", i, j, k);
                 }
                 free(database->value[i][j]);
-                fprintf(stderr, "Freed value[%zu][%d].\n", i, j);
             }
             free(database->value[i]);
-            fprintf(stderr, "Freed value[%zu].\n", i);
         }
         free(database->value);
-        fprintf(stderr, "Freed value array.\n");
     }
 }
 
@@ -1073,12 +1009,11 @@ int main() {
     // Setup signal handling for graceful termination
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
-    signal(SIGALRM, signal_handler);
 
     // Attempt to load database from disk. If not present, init from scratch.
     int chkinit = loadDB(&database);
     if(chkinit) {
-        fprintf(stderr, "Initializing database from scratch.\n");
+        printf("Initializing please wait...\n");
         init(&database);
     }
 
@@ -1099,7 +1034,6 @@ int main() {
             for (int i = 0; i < CMDMAX + 1; i++) {
                 prevCmdint[i] = cmdint[i];
             }
-            fprintf(stderr, "First command constructed and stored in prevCmdint.\n");
         } else {
             // Check redundancy with previous command
             int currentRed = 0;
@@ -1108,15 +1042,12 @@ int main() {
                     currentRed++;
                 }
             }
-            fprintf(stderr, "Current redundancy: %d\n", currentRed);
             // Adjust srchpct based on redundancy
             if (currentRed > prevRedundancy && srchpct > SRCHMIN) {
                 srchpct--;
-                fprintf(stderr, "Redundancy increased. Decreasing srchpct to %d%%\n", srchpct);
             } else {
                 srchpct++;
                 if (srchpct > SRCHMAX) srchpct = SRCHMAX;
-                fprintf(stderr, "Redundancy not increased. Increasing srchpct to %d%%\n", srchpct);
             }
             prevRedundancy = currentRed;
 
@@ -1154,23 +1085,18 @@ int main() {
                 if (cmdlen < CMDMAX) {
                     cmdlen += (rand() % 2); 
                     if (cmdlen >= CMDMAX) cmdlen = CMDMAX - 1;
-                    fprintf(stderr, "Learning improved or stayed same. Increasing cmdlen to %d.\n", cmdlen);
                 }
             } else if (cmdlen > 1) {
                 // If we learned less than before, try shorter commands
                 cmdlen -= (rand() % 2);
                 if (cmdlen < 1) cmdlen = 1;
-                fprintf(stderr, "Learning decreased. Decreasing cmdlen to %d.\n", cmdlen);
             }
             prevlrnval = lrnval;
             writeCount++;
-        } else {
-            fprintf(stderr, "No output from command. Skipping database update.\n");
         }
-
+        
         // Write database to files periodically
         if (writeCount == WRITEIVL) {
-            fprintf(stderr, "Write interval reached. Writing database to disk.\n");
             writeDB(&database);
             writeCount = 0;
         }
