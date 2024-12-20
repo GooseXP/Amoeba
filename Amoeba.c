@@ -1244,13 +1244,17 @@ int main() {
 	}
 	printf("\nTermination requested. Saving data, and cleaning up...\n");
 	
-	// 1. Write the database before closeing
+	// 1. Wait for all existing threads to finish
+	for(int i = 0; i < MAX_THREADS; i++) {
+		sem_wait(&thread_sem);
+		}
+	// 2. Write the database before closeing
 	writeDB(&database);
 	
-	// 2. Cleanup all dynamically allocated memory
+	// 3. Cleanup all dynamically allocated memory
 	cleanup_database(&database);
 	
-	// 3. Destroy semaphore and mutex
+	// 4. Destroy semaphore and mutex
 	sem_destroy(&thread_sem);
 	pthread_mutex_destroy(&db_mutex);
 	
