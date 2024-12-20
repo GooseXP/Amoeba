@@ -19,8 +19,7 @@
 #define SRCHMIN 1				// Minimum percentage to search database
 #define SRCHMAX 100				// Maximum percentage to search database
 #define CMDMAX 10				// Maximum number of arguments (words) in a generated command
-#define RUNTIME 3				// Child process allowed runtime in seconds
-#define NORMTHLD 250			// Threshold for normalization (not currently used)
+#define RUNTIME 10				// Child process allowed runtime in seconds
 #define REWARD 10				// Reward value when new data is learned
 #define PENALTY 1				// Penalty value when redundant data is observed
 #define INPUTBONUS 1			// Extra value added if input arguments appear together in observation_ptr
