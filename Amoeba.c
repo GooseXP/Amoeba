@@ -14,18 +14,18 @@
 #include <errno.h>
 
 // Set various buffer sizes and constants used throughout the program
-#define LINEBUFFER 100		// Max number of tokens per observation line
-#define WRDBUFFER 100		 // Max length of a single word
-#define SRCHMIN 1			 // Minimum percentage to search database
-#define SRCHMAX 100		   // Maximum percentage to search database
-#define CMDMAX 10			 // Maximum number of arguments (words) in a generated command
-#define RUNTIME 3			 // Child process allowed runtime in seconds
-#define NORMTHLD 250		  // Threshold for normalization (not currently used)
-#define REWARD 10			 // Reward value when new data is learned
-#define PENALTY 1			 // Penalty value when redundant data is observed
-#define INPUTBONUS 1		  // Extra value added if input arguments appear together in observation_ptr
-#define MAX_THREADS 8		 // Maximum number of concurrent threads
-#define TREND_WINDOW_SIZE 10  // Number of recent lrnval entries to consider for moving average
+#define LINEBUFFER 100			// Max number of tokens per observation line
+#define WRDBUFFER 100			// Max length of a single word
+#define SRCHMIN 1				// Minimum percentage to search database
+#define SRCHMAX 100				// Maximum percentage to search database
+#define CMDMAX 10				// Maximum number of arguments (words) in a generated command
+#define RUNTIME 3				// Child process allowed runtime in seconds
+#define NORMTHLD 250			// Threshold for normalization (not currently used)
+#define REWARD 10				// Reward value when new data is learned
+#define PENALTY 1				// Penalty value when redundant data is observed
+#define INPUTBONUS 1			// Extra value added if input arguments appear together in observation_ptr
+#define MAX_THREADS 8			// Maximum number of concurrent threads
+#define TREND_WINDOW_SIZE 10	// Number of recent lrnval entries to consider for moving average
 
 // Mutex for database access
 pthread_mutex_t db_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -35,12 +35,12 @@ sem_t thread_sem;
 
 // TrendTracker structure to maintain a moving average of lrnval
 typedef struct {
-	int window_size;		   // Number of recent lrnval entries to consider
-	int* lrnvals;			  // Array to store recent lrnval values
-	int index;				 // Current index in the circular buffer
-	int count;				 // Number of lrnval entries added
-	double moving_average;	 // Current moving average of lrnval
-	pthread_mutex_t mutex;	 // Mutex to protect access to the structure
+	int window_size;		// Number of recent lrnval entries to consider
+	int* lrnvals;			// Array to store recent lrnval values
+	int index;				// Current index in the circular buffer
+	int count;				// Number of lrnval entries added
+	double moving_average;	// Current moving average of lrnval
+	pthread_mutex_t mutex;	// Mutex to protect access to the structure
 } TrendTracker;
 
 // DatabaseStruct holds the learned words, their values, and observation_ptr
@@ -521,11 +521,64 @@ int loadDB(DatabaseStruct* database) {
 	return 0;
 }
 
+// Function: check_child_status
+// Waits for the child process to finish or kills it after RUNTIME seconds.
+// If child is not responding, tries SIGTERM, then SIGKILL, up to 3 attempts.
+int check_child_status(pid_t child_pid) {
+	int status;
+	time_t start_time, current_time;
+	time(&start_time);
+	int kill_attempts = 0;
+
+	while (1) {
+		pid_t wpid = waitpid(child_pid, &status, WNOHANG);
+		time(&current_time);
+		int proc_time = (int)difftime(current_time, start_time);
+
+		if (proc_time >= RUNTIME) {
+			// Child ran too long, try to kill it
+			if (kill_attempts == 0) {
+				if (kill(child_pid, SIGTERM) != 0) {
+					printf("Timeout reached sending SIGTERM\n");
+				}
+			} else if (kill_attempts == 1) {
+				if (kill(child_pid, SIGKILL) != 0) {
+					printf("SIGTERM didn't work trying SIGKILL\n");
+				}
+			} else if (kill_attempts == 2) {
+				fprintf(stderr, "Failed to terminate the child process %d.\n", child_pid);
+				child_pid = 0;
+				return 1;
+			}
+			sleep(1);
+			kill_attempts++;
+		} else if (wpid == child_pid) {
+			// wpid matches child_pid, so child changed state
+			if (WIFEXITED(status)) {
+				child_pid = 0;
+				return 0;
+			}
+			if (WIFSIGNALED(status)) {
+				child_pid = 0;
+				return 0;
+			}
+		} else if (wpid < 0) {
+			fprintf(stderr, "waitpid");
+			child_pid = 0;
+			return 1;
+		}
+		// Short sleep to prevent busy waiting
+		usleep(100000); // 100 ms
+	}
+}
+
+
 // Function: constructCommand
 // Attempts to construct a command array of length cmdlen from the learned words.
 // srchpct indicates the percentage of the word database to search.
 // This function tries to find a command combination with improved 'value'.
 int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
+	pthread_mutex_lock(&db_mutex);
 	// Extract shortcuts to data
 	size_t numWords = database->numWords;
 	size_t numObservations = database->numObservations;
@@ -623,42 +676,44 @@ int* constructCommand(DatabaseStruct* database, int cmdlen, int srchpct) {
 			}
 		}
 	}
-
 	cmdint[cmdlen] = -1; // Terminate command list
+	pthread_mutex_unlock(&db_mutex);
 	return cmdint;
 }
 
 // Function: executeCommand
 // Executes the given command string using /bin/sh, and captures its output (stdout/stderr) into a string.
 // Returns the output as a dynamically allocated char*.
-// Terminates the child process if it exceeds RUNTIME seconds.
 char* executeCommand(char cmd[]) {
-	pid_t child_pid = 0;
 	int pipefd[2];
 	if (pipe(pipefd) == -1) {
-		perror("pipe");
+		fprintf(stderr, "Failed to create pipe: %s\n", strerror(errno));
 		return NULL;
 	}
 
 	// Fork a child to run the command
-	if ((child_pid = fork()) == 0) {
+	pid_t child_pid = fork();
+	if (child_pid == 0) {
 		// Child process: redirect stdout & stderr into pipe
-		close(pipefd[0]);
-		dup2(pipefd[1], 1);
-		dup2(pipefd[1], 2);
-		close(pipefd[1]);
-		execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)0);
-		perror("execl");
+		close(pipefd[0]); // Close read end in child
+		if (dup2(pipefd[1], STDOUT_FILENO) == -1 || dup2(pipefd[1], STDERR_FILENO) == -1) {
+			fprintf(stderr, "dup2 failed: %s\n", strerror(errno));
+			close(pipefd[1]);
+			exit(EXIT_FAILURE);
+		}
+		close(pipefd[1]); // Close write end after redirecting
+		execl("/bin/sh", "/bin/sh", "-c", cmd, (char *)NULL);
+		fprintf(stderr, "execl failed: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	} else if (child_pid < 0) {
-		// fork failed
-		perror("fork");
+		// Fork failed
+		fprintf(stderr, "Fork failed: %s\n", strerror(errno));
 		close(pipefd[0]);
 		close(pipefd[1]);
 		return NULL;
 	}
 
-	// Parent: close write end, read from pipe
+	// Parent process: close write end, read from pipe
 	close(pipefd[1]);
 	char* output = malloc(1);
 	if (!output) {
@@ -666,63 +721,17 @@ char* executeCommand(char cmd[]) {
 		close(pipefd[0]);
 		return NULL;
 	}
-	int output_index = 0;
-	char current_char;
-	time_t start_time = time(NULL);
-	int status;
-	int child_terminated = 0;
 
-	while (1) {
-		pid_t result = waitpid(child_pid, &status, WNOHANG);
-		if (result == 0) {
-			// Child still running
-			time_t current_time = time(NULL);
-			if (difftime(current_time, start_time) >= RUNTIME) {
-				// Timeout reached, kill the child
-				kill(child_pid, SIGKILL);
-				break;
-			}
-			// Sleep for a short interval before checking again
-			usleep(100000); // 100ms
-		} else if (result == child_pid) {
-			// Child terminated
-			child_terminated = 1;
-			break;
-		} else {
-			// Error in waitpid
-			if (errno == EINTR) {
-				continue;
-			}
-			perror("waitpid");
-			break;
-		}
-
-		// Read from pipe if data is available
-		ssize_t bytes_read = read(pipefd[0], &current_char, 1);
-		if (bytes_read > 0) {
-			if (current_char == '\n' || isprint((unsigned char)current_char)) {
-				char* temp = realloc(output, sizeof(char) * (output_index + 2));
-				if (!temp) {
-					fprintf(stderr, "Failed to realloc memory for command output\n");
-					free(output);
-					close(pipefd[0]);
-					return NULL;
-				}
-				output = temp;
-				output[output_index++] = current_char;
-			}
-		} else if (bytes_read == 0) {
-			// EOF
-			break;
-		} else {
-			if (errno != EAGAIN && errno != EWOULDBLOCK) {
-				perror("read");
-				break;
-			}
-		}
+	// Check child process status before reading data
+	if (check_child_status(child_pid) != 0) {
+		fprintf(stderr, "Child process failed or timed out\n");
+		free(output);
+		close(pipefd[0]);
+		return NULL;
 	}
 
-	// Ensure all remaining data is read
+	int output_index = 0;
+	char current_char;
 	while (read(pipefd[0], &current_char, 1) > 0) {
 		if (current_char == '\n' || isprint((unsigned char)current_char)) {
 			char* temp = realloc(output, sizeof(char) * (output_index + 2));
@@ -736,20 +745,18 @@ char* executeCommand(char cmd[]) {
 			output[output_index++] = current_char;
 		}
 	}
-
 	close(pipefd[0]);
 
-	if (!child_terminated) {
-		// Wait for child to terminate after killing
-		waitpid(child_pid, &status, 0);
-	}
-
-	output = realloc(output, sizeof(char) * (output_index + 1));
-	if (!output) {
+	// Null-terminate the output
+	char* temp = realloc(output, sizeof(char) * (output_index + 1));
+	if (!temp) {
 		fprintf(stderr, "Failed to realloc memory for final command output\n");
+		free(output);
 		return NULL;
 	}
+	output = temp;
 	output[output_index] = '\0';
+
 	return output;
 }
 
@@ -1039,9 +1046,6 @@ int analyzeTrend(TrendTracker* tracker, double previous_average) {
 
 // Thread function to execute command and update database
 void* thread_function(void* arg) {
-	// Acquire semaphore
-	sem_wait(&thread_sem);
-
 	// Cast the argument to ThreadData*
 	ThreadData* data = (ThreadData*) arg;
 	DatabaseStruct* database = data->database;
@@ -1143,33 +1147,8 @@ int main() {
 	memset(cmd, 0, sizeof(cmd));
 
 	// Main loop: Continues until termination_requested is set
-	while (1) {
-		if (termination_requested) {
-			printf("\nTermination requested. Saving data, and cleaning up...\n");
-			
-			// Perform necessary cleanup
-			// 1. Wait for all existing threads to finish
-			for(int i = 0; i < MAX_THREADS; i++) {
-				sem_wait(&thread_sem);
-			}
-			
-			// 2. Write the database before closeing
-			writeDB(&database);
-			
-			// 3. Cleanup all dynamically allocated memory
-			cleanup_database(&database);
-			
-			// 4. Destroy semaphore and mutex
-			sem_destroy(&thread_sem);
-			pthread_mutex_destroy(&db_mutex);
-			
-			// Cleanup TrendTracker
-			free(trend_tracker.lrnvals);
-			pthread_mutex_destroy(&trend_tracker.mutex);
-			
-			printf("Cleanup complete. Exiting program.\n");
-			exit(EXIT_SUCCESS);
-		}
+	while (!termination_requested) {
+		sem_wait(&thread_sem);
 		// Construct the command
 		int* cmdint_ptr = constructCommand(&database, cmdlen, srchpct);
 
@@ -1208,7 +1187,7 @@ int main() {
 		// Build command string from cmdint
 		cmd[0] = '\0';
 		for (int i = 0; cmdint_ptr[i] != -1; i++) {
-			if (cmdint_ptr[i] >= 0 && (size_t)cmdint_ptr[i] < database.numWords) {
+			if (cmdint_ptr[i] >= 0 && (size_t)cmdint_ptr[i] < database.numWords) {	
 				strcat(cmd, database.token[cmdint_ptr[i]]);
 				strcat(cmd, " ");
 			} else {
@@ -1263,5 +1242,22 @@ int main() {
 			// Update previous_average
 			previous_average = current_average;
 	}
+	printf("\nTermination requested. Saving data, and cleaning up...\n");
+	
+	// 1. Write the database before closeing
+	writeDB(&database);
+	
+	// 2. Cleanup all dynamically allocated memory
+	cleanup_database(&database);
+	
+	// 3. Destroy semaphore and mutex
+	sem_destroy(&thread_sem);
+	pthread_mutex_destroy(&db_mutex);
+	
+	// Cleanup TrendTracker
+	free(trend_tracker.lrnvals);
+	pthread_mutex_destroy(&trend_tracker.mutex);
+	
+	printf("Cleanup complete. Exiting program.\n");
 	return 0;
 }
