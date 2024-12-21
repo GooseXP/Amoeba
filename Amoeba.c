@@ -610,10 +610,10 @@ int* construct_command(Words* words, CommandSettings* settings) {
 	int cmdval = 0;
 	int prevcmdval = 0;
 
-	// cmdint will hold the indices of words chosen for the command
+	// command_integers will hold the indices of words chosen for the command
 	// static to avoid returning pointer to local variable
-	static int cmdint[CMDMAX + 1];
-	for(int i = 0; i < CMDMAX + 1; i++) cmdint[i] = -1;
+	static int command_integers[CMDMAX + 1];
+	for(int i = 0; i < CMDMAX + 1; i++) command_integers[i] = -1;
 
 	// For simplicity, the code tries multiple iterations (srchitr) 
 	// and tries to improve the command value by changing arguments
@@ -622,20 +622,20 @@ int* construct_command(Words* words, CommandSettings* settings) {
 			// Randomly select a word
 			if (numWords == 0) {
 				// No words available to construct command
-				return cmdint;
+				return command_integers;
 			}
 			select = (int)(rand() % numWords);
 			if (i == 0) {
 				// First iteration builds a baseline command
-				cmdint[j] = select;
+				command_integers[j] = select;
 				if (j == settings->length-1) {
 					// Once the command is fully chosen, calculate its initial score
 					for (int k = 0; k < settings->length; k++) {
 						for (int l = 0; l < settings->length; l++) {
-							if (cmdint[k] < 0 || cmdint[l] < 0 || (size_t)cmdint[k] >= numWords || (size_t)cmdint[l] >= numWords) {
+							if (command_integers[k] < 0 || command_integers[l] < 0 || (size_t)command_integers[k] >= numWords || (size_t)command_integers[l] >= numWords) {
 								continue;
 							}
-							prevcmdval += (*value_ptr)[cmdint[k]][k][cmdint[l]][l];
+							prevcmdval += (*value_ptr)[command_integers[k]][k][command_integers[l]][l];
 						}
 					}
 				}
@@ -643,24 +643,24 @@ int* construct_command(Words* words, CommandSettings* settings) {
 				// Subsequent iterations: try changing one argument and see if it improves
 				cmdval = 0;
 				for (int k = 0; k < settings->length; k++) {
-					if (select < 0 || cmdint[k] < 0 || (size_t)select >= numWords || (size_t)cmdint[k] >= numWords) {
+					if (select < 0 || command_integers[k] < 0 || (size_t)select >= numWords || (size_t)command_integers[k] >= numWords) {
 						continue;
 					}
-					cmdval += (*value_ptr)[select][j][cmdint[k]][k];
+					cmdval += (*value_ptr)[select][j][command_integers[k]][k];
 				}
 				// If the new cmdval is better than prevcmdval, update the command
 				if (cmdval > prevcmdval) {
-					cmdint[j] = select;
+					command_integers[j] = select;
 					prevcmdval = cmdval;
 					cmdval = 0;
 				}
 			}
 		}
 	}
-	cmdint[settings->length] = -1; // Terminate command list
+	command_integers[settings->length] = -1; // Terminate command list
 	pthread_mutex_unlock(&words->mutex);
 	pthread_mutex_unlock(&settings->mutex);
-	return cmdint;
+	return command_integers;
 }
 
 // Function: execute_command
